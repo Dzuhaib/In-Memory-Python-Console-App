@@ -31,7 +31,12 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+*   [ ] **I. Simplicity and Clarity**: Is the proposed solution straightforward and easy to understand?
+*   [ ] **II. In-Memory Operation**: Does the design rely only on in-memory data structures, with no file I/O or database access?
+*   [ ] **III. Test-Driven Development (TDD)**: Does the plan include a TDD approach, starting with failing tests?
+*   [] **IV. Standard Library Only**: Does the plan avoid all third-party libraries and stick to the Python standard library?
+*   [ ] **V. Functional Decomposition**: Are complex problems broken down into small, pure functions where possible?
+*   [ ] **VI. Spec-Driven Development (SDD)**: Is the plan directly derived from and traceable to the feature specification?
 
 ## Project Structure
 
