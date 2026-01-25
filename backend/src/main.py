@@ -8,13 +8,10 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import settings
-
 # Print startup info for debugging
 print(f"Starting Todo API...", file=sys.stderr)
 print(f"DATABASE_URL configured: {'Yes' if os.environ.get('DATABASE_URL') else 'No (using default)'}", file=sys.stderr)
 print(f"PORT: {os.environ.get('PORT', 'Not set (using 8000)')}", file=sys.stderr)
-print(f"CORS_ORIGINS: {os.environ.get('CORS_ORIGINS', 'Not set (using defaults)')}", file=sys.stderr)
 
 
 @asynccontextmanager
@@ -22,7 +19,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
     print("Initializing application...", file=sys.stderr)
 
-    # Import here to avoid circular imports and to delay DB connection
     from database import create_db_and_tables
     from models.task import Task  # Ensure model is registered
 
@@ -45,34 +41,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configure CORS - be permissive to avoid issues
-# Check if we're in production (Railway sets various env vars)
-is_production = any([
-    os.environ.get("RAILWAY_ENVIRONMENT_NAME"),
-    os.environ.get("RAILWAY_PROJECT_ID"),
-    os.environ.get("RAILWAY_SERVICE_ID"),
-])
-
-print(f"Production mode: {is_production}", file=sys.stderr)
-
-# In production, allow all origins without credentials (simplest, works)
-# In development, use configured origins
-if is_production:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=False,  # Must be False when using wildcard
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-else:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins_list,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# CORS - Allow all origins (simplest solution that works)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Include API routes
 from api.router import api_router
