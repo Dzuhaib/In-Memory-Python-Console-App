@@ -1,0 +1,434 @@
+openapi: 3.0.3
+info:
+  title: Todo App API
+  description: |
+    REST API for Phase 2 Full Stack Web Application.
+    Provides CRUD operations for tasks with priorities, tags, search, filter, and sort.
+  version: 1.0.0
+  contact:
+    name: Todo App Hackathon
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Development server
+
+tags:
+  - name: Tasks
+    description: Task management endpoints
+  - name: Health
+    description: Health check endpoint
+
+paths:
+  /tasks:
+    get:
+      tags:
+        - Tasks
+      summary: List all tasks
+      description: Returns all tasks with optional filtering, searching, and sorting
+      operationId: listTasks
+      parameters:
+        - name: search
+          in: query
+          description: Case-insensitive search term for task titles
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by completion status
+          schema:
+            type: string
+            enum: [complete, incomplete]
+        - name: priority
+          in: query
+          description: Filter by priority level
+          schema:
+            type: string
+            enum: [high, medium, low]
+        - name: tag
+          in: query
+          description: Filter by tag (tasks containing this tag)
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [priority, alpha, id]
+            default: id
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      tags:
+        - Tasks
+      summary: Create a new task
+      description: Creates a new task with the provided details
+      operationId: createTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '201':
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tasks/{taskId}:
+    parameters:
+      - name: taskId
+        in: path
+        required: true
+        description: Unique task identifier
+        schema:
+          type: integer
+          minimum: 1
+
+    get:
+      tags:
+        - Tasks
+      summary: Get a single task
+      description: Returns a task by its ID
+      operationId: getTask
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      tags:
+        - Tasks
+      summary: Update a task
+      description: Updates an existing task's title and/or priority
+      operationId: updateTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskRequest'
+      responses:
+        '200':
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      tags:
+        - Tasks
+      summary: Delete a task
+      description: Permanently removes a task
+      operationId: deleteTask
+      responses:
+        '204':
+          description: Task deleted successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tasks/{taskId}/complete:
+    parameters:
+      - name: taskId
+        in: path
+        required: true
+        description: Unique task identifier
+        schema:
+          type: integer
+          minimum: 1
+
+    patch:
+      tags:
+        - Tasks
+      summary: Toggle task completion
+      description: Toggles the completed status of a task
+      operationId: toggleComplete
+      responses:
+        '200':
+          description: Completion status toggled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tasks/{taskId}/tags:
+    parameters:
+      - name: taskId
+        in: path
+        required: true
+        description: Unique task identifier
+        schema:
+          type: integer
+          minimum: 1
+
+    post:
+      tags:
+        - Tasks
+      summary: Add a tag to a task
+      description: Adds a new tag to the specified task
+      operationId: addTag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTagRequest'
+      responses:
+        '200':
+          description: Tag added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /tasks/{taskId}/tags/{tag}:
+    parameters:
+      - name: taskId
+        in: path
+        required: true
+        description: Unique task identifier
+        schema:
+          type: integer
+          minimum: 1
+      - name: tag
+        in: path
+        required: true
+        description: Tag to remove
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 50
+
+    delete:
+      tags:
+        - Tasks
+      summary: Remove a tag from a task
+      description: Removes a tag from the specified task
+      operationId: removeTag
+      responses:
+        '200':
+          description: Tag removed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Returns the health status of the API
+      operationId: healthCheck
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  schemas:
+    Task:
+      type: object
+      required:
+        - id
+        - title
+        - completed
+        - priority
+        - tags
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          description: Unique task identifier
+          example: 1
+        title:
+          type: string
+          description: Task description
+          minLength: 1
+          maxLength: 500
+          example: "Buy groceries"
+        completed:
+          type: boolean
+          description: Whether the task is completed
+          example: false
+        priority:
+          type: string
+          enum: [high, medium, low]
+          description: Priority level
+          example: "medium"
+        tags:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 50
+          description: List of tags
+          example: ["shopping", "personal"]
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp (ISO 8601)
+          example: "2026-01-25T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp (ISO 8601)
+          example: "2026-01-25T10:30:00Z"
+
+    CreateTaskRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          description: Task description
+          minLength: 1
+          maxLength: 500
+          example: "Buy groceries"
+        priority:
+          type: string
+          enum: [high, medium, low]
+          description: Priority level (default: medium)
+          example: "high"
+        tags:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 50
+          description: Initial tags
+          example: ["shopping"]
+
+    UpdateTaskRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          description: New task description
+          minLength: 1
+          maxLength: 500
+          example: "Buy organic groceries"
+        priority:
+          type: string
+          enum: [high, medium, low]
+          description: New priority level
+          example: "low"
+
+    AddTagRequest:
+      type: object
+      required:
+        - tag
+      properties:
+        tag:
+          type: string
+          description: Tag to add
+          minLength: 1
+          maxLength: 50
+          example: "urgent"
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: Health status
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+          description: Current server time
+          example: "2026-01-25T10:30:00Z"
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: Error message
+          example: "Task not found"
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "Task not found"
+
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "Title cannot be empty"
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "An unexpected error occurred"
