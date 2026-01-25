@@ -61,8 +61,8 @@ export default function Home() {
           <p className="text-gray-600 mt-2">Manage your tasks efficiently</p>
         </header>
 
-        {/* Task Creation Form */}
-        <TaskForm onSubmit={handleCreateTask} disabled={loading} />
+        {/* Task Creation Form - never disabled, users can always add tasks */}
+        <TaskForm onSubmit={handleCreateTask} />
 
         {/* Search Bar */}
         <div className="bg-white p-4 rounded-lg shadow mb-4">

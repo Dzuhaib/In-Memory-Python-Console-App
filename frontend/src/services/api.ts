@@ -13,33 +13,63 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
+// Log API URL on load (helps debug)
+if (typeof window !== 'undefined') {
+  console.log('API URL:', API_URL);
+}
+
 /**
- * Generic fetch wrapper with error handling.
+ * Generic fetch wrapper with error handling and timeout.
  */
 async function fetchApi<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  timeoutMs: number = 15000
 ): Promise<T> {
   const url = `${API_URL}${endpoint}`;
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'An error occurred' }));
-    throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+  // Create abort controller for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'An error occurred' }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    // Handle 204 No Content
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    return response.json();
+  } catch (err) {
+    clearTimeout(timeoutId);
+
+    if (err instanceof Error) {
+      if (err.name === 'AbortError') {
+        throw new Error('Request timed out. Please check if the backend is running.');
+      }
+      // Network errors
+      if (err.message === 'Failed to fetch') {
+        throw new Error('Cannot connect to API. Check NEXT_PUBLIC_API_URL and CORS settings.');
+      }
+      throw err;
+    }
+    throw new Error('An unexpected error occurred');
   }
-
-  // Handle 204 No Content
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json();
 }
 
 /**
