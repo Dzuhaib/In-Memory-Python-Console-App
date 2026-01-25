@@ -14,6 +14,7 @@ from config import settings
 print(f"Starting Todo API...", file=sys.stderr)
 print(f"DATABASE_URL configured: {'Yes' if os.environ.get('DATABASE_URL') else 'No (using default)'}", file=sys.stderr)
 print(f"PORT: {os.environ.get('PORT', 'Not set (using 8000)')}", file=sys.stderr)
+print(f"CORS_ORIGINS: {os.environ.get('CORS_ORIGINS', 'Not set (using defaults)')}", file=sys.stderr)
 
 
 @asynccontextmanager
@@ -31,8 +32,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         print("Database tables created successfully", file=sys.stderr)
     except Exception as e:
         print(f"ERROR during startup: {e}", file=sys.stderr)
-        # Don't raise - let the app start so health checks can report status
-        # The app will fail on actual DB operations but at least we can debug
 
     print("Application ready", file=sys.stderr)
     yield
@@ -46,19 +45,34 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configure CORS - allow all origins in production if not specified
-cors_origins = settings.cors_origins_list
-if os.environ.get("RAILWAY_ENVIRONMENT"):
-    # On Railway, be more permissive with CORS
-    cors_origins = ["*"]
+# Configure CORS - be permissive to avoid issues
+# Check if we're in production (Railway sets various env vars)
+is_production = any([
+    os.environ.get("RAILWAY_ENVIRONMENT_NAME"),
+    os.environ.get("RAILWAY_PROJECT_ID"),
+    os.environ.get("RAILWAY_SERVICE_ID"),
+])
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+print(f"Production mode: {is_production}", file=sys.stderr)
+
+# In production, allow all origins without credentials (simplest, works)
+# In development, use configured origins
+if is_production:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,  # Must be False when using wildcard
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins_list,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Include API routes
 from api.router import api_router
