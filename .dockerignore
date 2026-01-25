@@ -1,0 +1,16 @@
+__pycache__
+*.pyc
+*.pyo
+.env
+.env.local
+.git
+.gitignore
+*.md
+.pytest_cache/
+.coverage
+htmlcov/
+frontend/
+specs/
+history/
+.specify/
+.claude/
