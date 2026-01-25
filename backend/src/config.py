@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./todo.db"
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:3000"
+    port: int = 8000
+    host: str = "0.0.0.0"
 
     @property
     def cors_origins_list(self) -> List[str]:
