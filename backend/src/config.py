@@ -1,5 +1,6 @@
 """Environment configuration management."""
 
+import os
 from functools import lru_cache
 from typing import List
 
@@ -7,28 +8,31 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables.
+    """Application settings loaded from environment variables."""
 
-    Attributes:
-        database_url: PostgreSQL connection string (required)
-        log_level: Logging level (default: INFO)
-        cors_origins: Allowed CORS origins (default: localhost:3000)
-    """
+    # Database - Railway auto-injects DATABASE_URL
+    database_url: str = os.environ.get("DATABASE_URL", "sqlite:///./todo.db")
 
-    database_url: str = "sqlite:///./todo.db"
+    # Logging
     log_level: str = "INFO"
-    cors_origins: str = "http://localhost:3000"
-    port: int = 8000
+
+    # CORS - comma-separated origins
+    cors_origins: str = "http://localhost:3000,http://localhost:5173"
+
+    # Server
+    port: int = int(os.environ.get("PORT", "8000"))
     host: str = "0.0.0.0"
 
     @property
     def cors_origins_list(self) -> List[str]:
         """Parse CORS origins from comma-separated string."""
-        return [origin.strip() for origin in self.cors_origins.split(",")]
+        origins = [origin.strip() for origin in self.cors_origins.split(",")]
+        return [o for o in origins if o]  # Filter empty strings
 
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"  # Ignore extra env vars
 
 
 @lru_cache()
