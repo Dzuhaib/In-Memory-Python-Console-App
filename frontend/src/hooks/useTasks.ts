@@ -77,6 +77,22 @@ export function useTasks(): UseTasksReturn {
     fetchTasks(params);
   }, [searchTerm, statusFilter, priorityFilter, tagFilter, sortBy, fetchTasks]);
 
+  // Listen for tasks-updated event from chat widget
+  useEffect(() => {
+    const handleTasksUpdated = () => {
+      const params: TaskQueryParams = {};
+      if (searchTerm) params.search = searchTerm;
+      if (statusFilter) params.status = statusFilter as 'complete' | 'incomplete';
+      if (priorityFilter) params.priority = priorityFilter as Priority;
+      if (tagFilter) params.tag = tagFilter;
+      if (sortBy) params.sort = sortBy as 'priority' | 'alpha' | 'id';
+      fetchTasks(params);
+    };
+
+    window.addEventListener('tasks-updated', handleTasksUpdated);
+    return () => window.removeEventListener('tasks-updated', handleTasksUpdated);
+  }, [searchTerm, statusFilter, priorityFilter, tagFilter, sortBy, fetchTasks]);
+
   const createTask = useCallback(async (request: CreateTaskRequest): Promise<Task | null> => {
     try {
       const task = await api.createTask(request);

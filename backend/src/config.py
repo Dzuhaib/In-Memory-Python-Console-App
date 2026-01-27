@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     port: int = int(os.environ.get("PORT", "8000"))
     host: str = "0.0.0.0"
 
+    # OpenAI API Key for ChatKit
+    openai_api_key: str = ""
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Parse CORS origins from comma-separated string."""

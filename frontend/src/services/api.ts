@@ -13,11 +13,6 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-// Log API URL on load (helps debug)
-if (typeof window !== 'undefined') {
-  console.log('API URL:', API_URL);
-}
-
 /**
  * Generic fetch wrapper with error handling and timeout.
  */
