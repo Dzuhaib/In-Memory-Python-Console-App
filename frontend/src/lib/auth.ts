@@ -1,5 +1,7 @@
 import { betterAuth } from "better-auth";
-import { Pool } from "pg";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { drizzle } from "drizzle-orm/neon-http";
+import { neon } from "@neondatabase/serverless";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -9,15 +11,21 @@ function getBaseURL() {
   return "http://localhost:3000";
 }
 
-const database = databaseUrl
-  ? new Pool({
-      connectionString: databaseUrl,
-      ssl: { rejectUnauthorized: false },
-    })
-  : { provider: "sqlite" as const, url: "file:./auth.db" };
+function getDatabase() {
+  if (!databaseUrl) {
+    // Fallback for build time when DATABASE_URL is not set
+    return { provider: "sqlite" as const, url: "file:./auth.db" };
+  }
+  const sql = neon(databaseUrl);
+  const db = drizzle({ client: sql });
+  return drizzleAdapter(db, {
+    provider: "pg",
+    transaction: false, // Neon HTTP doesn't support transactions
+  });
+}
 
 export const auth = betterAuth({
-  database,
+  database: getDatabase(),
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
