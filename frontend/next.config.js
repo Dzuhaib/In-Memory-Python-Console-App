@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
-    serverComponentsExternalPackages: ['better-auth', '@neondatabase/serverless'],
+    serverComponentsExternalPackages: ['better-auth', 'pg'],
   },
 }
 

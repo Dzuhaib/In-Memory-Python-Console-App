@@ -1,5 +1,5 @@
 import { betterAuth } from "better-auth";
-import { Pool } from "@neondatabase/serverless";
+import { Pool } from "pg";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -9,10 +9,15 @@ function getBaseURL() {
   return "http://localhost:3000";
 }
 
+const database = databaseUrl
+  ? new Pool({
+      connectionString: databaseUrl,
+      ssl: { rejectUnauthorized: false },
+    })
+  : { provider: "sqlite" as const, url: "file:./auth.db" };
+
 export const auth = betterAuth({
-  database: databaseUrl
-    ? new Pool({ connectionString: databaseUrl })
-    : { provider: "sqlite" as const, url: "file:./auth.db" },
+  database,
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
