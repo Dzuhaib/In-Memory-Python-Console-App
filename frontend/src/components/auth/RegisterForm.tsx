@@ -24,21 +24,32 @@ export function RegisterForm() {
 
     setLoading(true);
 
-    const { error: signUpError } = await authClient.signUp.email({
-      email,
-      password,
-      name: name || email.split('@')[0],
-    });
+    try {
+      const { data, error: signUpError } = await authClient.signUp.email({
+        email,
+        password,
+        name: name || email.split('@')[0],
+      });
 
-    if (signUpError) {
-      const msg = signUpError.message || signUpError.statusText || 'Registration failed. Please try again.';
-      setError(msg);
+      if (signUpError) {
+        setError(signUpError.message || signUpError.statusText || JSON.stringify(signUpError));
+        setLoading(false);
+        return;
+      }
+
+      if (!data) {
+        setError('No response from server. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      router.push('/app');
+      router.refresh();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'An unexpected error occurred';
+      setError(message);
       setLoading(false);
-      return;
     }
-
-    router.push('/app');
-    router.refresh();
   };
 
   return (
