@@ -1,14 +1,23 @@
 import { betterAuth } from "better-auth";
 
+const databaseUrl = process.env.DATABASE_URL;
+
+function getBaseURL() {
+  if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL;
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "http://localhost:3000";
+}
+
 export const auth = betterAuth({
-  database: {
-    provider: "pg",
-    url: process.env.DATABASE_URL!,
-  },
+  database: databaseUrl
+    ? { provider: "pg", url: databaseUrl }
+    : { provider: "sqlite", url: "file:./auth.db" },
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
   },
+  secret: process.env.BETTER_AUTH_SECRET,
+  baseURL: getBaseURL(),
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
     cookieCache: {
@@ -17,6 +26,7 @@ export const auth = betterAuth({
     },
   },
   trustedOrigins: [
-    process.env.BETTER_AUTH_URL || "http://localhost:3000",
-  ],
+    getBaseURL(),
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "",
+  ].filter(Boolean),
 });
