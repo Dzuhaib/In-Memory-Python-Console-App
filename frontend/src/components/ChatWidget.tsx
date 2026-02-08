@@ -9,8 +9,20 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 
 // Web Speech API type declarations (vendor-prefixed)
+interface SpeechRecognitionResult {
+  readonly isFinal: boolean;
+  readonly length: number;
+  [index: number]: { transcript: string; confidence: number };
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  [index: number]: SpeechRecognitionResult;
+}
+
 interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
+  readonly results: SpeechRecognitionResultList;
+  readonly resultIndex: number;
 }
 
 interface SpeechRecognitionInstance extends EventTarget {
@@ -19,6 +31,7 @@ interface SpeechRecognitionInstance extends EventTarget {
   interimResults: boolean;
   start(): void;
   stop(): void;
+  abort(): void;
   onresult: ((event: SpeechRecognitionEvent) => void) | null;
   onend: (() => void) | null;
   onerror: ((event: Event) => void) | null;
@@ -47,6 +60,7 @@ export function ChatWidget() {
   const [speechSupported, setSpeechSupported] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const isSendingRef = useRef(false); // Ref-based guard against duplicate sends
 
   // Detect Web Speech API support
   useEffect(() => {
@@ -72,7 +86,11 @@ export function ChatWidget() {
 
   const sendMessage = useCallback(async (messageText?: string) => {
     const text = (messageText ?? input).trim();
-    if (!text || isLoading) return;
+    if (!text) return;
+
+    // Use ref guard to prevent duplicate sends (state can be stale in closures)
+    if (isSendingRef.current) return;
+    isSendingRef.current = true;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -158,29 +176,47 @@ export function ChatWidget() {
       setError(err instanceof Error ? err.message : 'Failed to connect');
     } finally {
       setIsLoading(false);
+      isSendingRef.current = false;
     }
-  }, [input, isLoading]);
+  }, [input]);
 
   const toggleVoice = useCallback(() => {
     if (isListening) {
-      recognitionRef.current?.stop();
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
       setIsListening(false);
+      setInput('');
       return;
     }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
+    const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionCtor) return;
 
-    const recognition = new SpeechRecognition();
+    const recognition = new SpeechRecognitionCtor();
     recognition.lang = 'en-US';
     recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.interimResults = true; // Show words as they're spoken
+
+    let hasSent = false; // Per-session guard against duplicate sends
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = event.results[0]?.[0]?.transcript;
-      if (transcript) {
+      // Get the latest result
+      const lastResult = event.results[event.results.length - 1];
+      const transcript = lastResult?.[0]?.transcript;
+
+      if (!transcript) return;
+
+      if (lastResult.isFinal) {
+        // Final result — stop immediately and send
+        if (!hasSent) {
+          hasSent = true;
+          recognition.stop();
+          setInput('');
+          sendMessage(transcript);
+        }
+      } else {
+        // Interim result — show in input for real-time feedback
         setInput(transcript);
-        sendMessage(transcript);
       }
     };
 
@@ -320,11 +356,16 @@ export function ChatWidget() {
               <input
                 type="text"
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => { if (!isListening) setInput(e.target.value); }}
                 onKeyDown={handleKeyDown}
                 placeholder={isListening ? 'Listening...' : 'Type or speak a message...'}
-                disabled={isLoading || isListening}
-                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+                readOnly={isListening}
+                disabled={isLoading}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1 disabled:bg-gray-100 ${
+                  isListening
+                    ? 'border-red-300 bg-red-50 focus:border-red-500 focus:ring-red-500'
+                    : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+                }`}
               />
               {speechSupported && (
                 <button
