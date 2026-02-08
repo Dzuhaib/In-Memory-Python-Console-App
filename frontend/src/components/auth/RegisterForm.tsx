@@ -32,7 +32,9 @@ export function RegisterForm() {
       });
 
       if (signUpError) {
-        setError(signUpError.message || signUpError.statusText || JSON.stringify(signUpError));
+        // Show full error details for debugging
+        const details = (signUpError as Record<string, unknown>).error || signUpError.message || signUpError.statusText;
+        setError(typeof details === 'string' ? details : JSON.stringify(signUpError));
         setLoading(false);
         return;
       }
