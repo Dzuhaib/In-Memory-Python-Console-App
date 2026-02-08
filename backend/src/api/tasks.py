@@ -19,7 +19,7 @@ def get_task_service(session: Session = Depends(get_session)) -> TaskService:
     return TaskService(session)
 
 
-@router.get("/tasks", response_model=List[Task])
+@router.get("/tasks")
 def list_tasks(
     search: Optional[str] = Query(None, description="Search term for task titles"),
     status: Optional[str] = Query(None, description="Filter by status: complete/incomplete"),
@@ -27,22 +27,39 @@ def list_tasks(
     tag: Optional[str] = Query(None, description="Filter by tag"),
     sort: Optional[str] = Query("id", description="Sort by: priority/alpha/id"),
     service: TaskService = Depends(get_task_service),
-) -> List[Task]:
+):
     """List all tasks with optional filtering, searching, and sorting."""
-    return service.list_tasks(
-        search=search,
-        status=status,
-        priority=priority,
-        tag=tag,
-        sort_by=sort,
-    )
+    import traceback
+    try:
+        tasks = service.list_tasks(
+            search=search,
+            status=status,
+            priority=priority,
+            tag=tag,
+            sort_by=sort,
+        )
+        return [
+            {
+                "id": t.id,
+                "title": t.title,
+                "completed": t.completed,
+                "priority": t.priority.value if hasattr(t.priority, 'value') else t.priority,
+                "tags": t.tags or [],
+                "created_at": t.created_at.isoformat() if t.created_at else None,
+                "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+            }
+            for t in tasks
+        ]
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/tasks", response_model=Task, status_code=201)
+@router.post("/tasks", status_code=201)
 def create_task(
     request: CreateTaskRequest,
     service: TaskService = Depends(get_task_service),
-) -> Task:
+):
     """Create a new task."""
     return service.create_task(
         title=request.title,
@@ -51,11 +68,11 @@ def create_task(
     )
 
 
-@router.get("/tasks/{task_id}", response_model=Task)
+@router.get("/tasks/{task_id}")
 def get_task(
     task_id: int,
     service: TaskService = Depends(get_task_service),
-) -> Task:
+):
     """Get a single task by ID."""
     task = service.get_task(task_id)
     if not task:
@@ -63,12 +80,12 @@ def get_task(
     return task
 
 
-@router.put("/tasks/{task_id}", response_model=Task)
+@router.put("/tasks/{task_id}")
 def update_task(
     task_id: int,
     request: UpdateTaskRequest,
     service: TaskService = Depends(get_task_service),
-) -> Task:
+):
     """Update an existing task."""
     if request.title is None and request.priority is None:
         raise HTTPException(status_code=400, detail="No changes specified")
@@ -94,11 +111,11 @@ def delete_task(
         raise HTTPException(status_code=404, detail="Task not found")
 
 
-@router.patch("/tasks/{task_id}/complete", response_model=Task)
+@router.patch("/tasks/{task_id}/complete")
 def toggle_complete(
     task_id: int,
     service: TaskService = Depends(get_task_service),
-) -> Task:
+):
     """Toggle the completion status of a task."""
     task = service.toggle_complete(task_id)
     if not task:
@@ -106,12 +123,12 @@ def toggle_complete(
     return task
 
 
-@router.post("/tasks/{task_id}/tags", response_model=Task)
+@router.post("/tasks/{task_id}/tags")
 def add_tag(
     task_id: int,
     request: AddTagRequest,
     service: TaskService = Depends(get_task_service),
-) -> Task:
+):
     """Add a tag to a task."""
     task = service.add_tag(task_id, request.tag)
     if not task:
@@ -119,12 +136,12 @@ def add_tag(
     return task
 
 
-@router.delete("/tasks/{task_id}/tags/{tag}", response_model=Task)
+@router.delete("/tasks/{task_id}/tags/{tag}")
 def remove_tag(
     task_id: int,
     tag: str,
     service: TaskService = Depends(get_task_service),
-) -> Task:
+):
     """Remove a tag from a task."""
     task = service.remove_tag(task_id, tag)
     if not task:
