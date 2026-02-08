@@ -31,7 +31,8 @@ export function RegisterForm() {
     });
 
     if (signUpError) {
-      setError(signUpError.message || 'Registration failed. Please try again.');
+      const msg = signUpError.message || signUpError.statusText || 'Registration failed. Please try again.';
+      setError(msg);
       setLoading(false);
       return;
     }
