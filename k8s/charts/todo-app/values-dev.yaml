@@ -1,0 +1,37 @@
+# Development values for todo-app Helm chart
+# Usage: helm install todo-app ./k8s/charts/todo-app -f ./k8s/charts/todo-app/values-dev.yaml
+
+# Override for development environment
+environment: development
+
+# Backend development settings
+backend:
+  replicas: 1
+  image:
+    repository: todo-backend
+    tag: local
+    pullPolicy: Never
+  config:
+    LOG_LEVEL: "DEBUG"
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+# Frontend development settings
+frontend:
+  replicas: 1
+  image:
+    repository: todo-frontend
+    tag: local
+    pullPolicy: Never
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"

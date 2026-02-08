@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.frontend.name }}-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "todo-app.frontend.labels" . | nindent 4 }}
+data:
+  # Use Kubernetes DNS to resolve backend service
+  NEXT_PUBLIC_API_URL: {{ .Values.frontend.config.NEXT_PUBLIC_API_URL | quote }}

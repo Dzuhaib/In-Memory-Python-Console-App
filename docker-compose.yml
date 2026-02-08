@@ -1,0 +1,68 @@
+# Docker Compose for local development
+# Run: docker-compose up --build
+# Access: Frontend at http://localhost:3000, Backend at http://localhost:8000
+
+version: '3.8'
+
+services:
+  # FastAPI Backend with OpenAI Agents SDK
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: todo-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Database connection (Neon PostgreSQL)
+      - DATABASE_URL=${DATABASE_URL}
+      # OpenAI API key for AI chatbot
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Server configuration
+      - PORT=8000
+      - HOST=0.0.0.0
+      - LOG_LEVEL=INFO
+      # CORS - allow frontend
+      - CORS_ORIGINS=http://localhost:3000,http://frontend:3000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - todo-network
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Build-time environment variable for API URL
+        - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+    container_name: todo-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      # Runtime environment variables
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - todo-network
+
+networks:
+  todo-network:
+    driver: bridge
+    name: todo-app-network

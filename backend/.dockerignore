@@ -1,12 +1,58 @@
+# Git
+.git
+.gitignore
+
+# Python
 __pycache__
 *.pyc
 *.pyo
-.env
-.env.local
-.git
-.gitignore
-tests/
-*.md
-.pytest_cache/
+*.pyd
+.Python
+*.egg-info
+.eggs
+*.egg
+.venv
+venv
+ENV
+env
+.pytest_cache
 .coverage
-htmlcov/
+htmlcov
+.tox
+.nox
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Testing
+tests/
+*.test.py
+conftest.py
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Environment files (secrets should be injected at runtime)
+.env
+.env.*
+*.local
+
+# Build artifacts
+dist/
+build/
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Misc
+*.log
+*.tmp
+.DS_Store
+Thumbs.db

@@ -1,0 +1,231 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Todo App Helm Values",
+  "description": "Schema for todo-app Helm chart values.yaml",
+  "type": "object",
+  "properties": {
+    "namespace": {
+      "type": "string",
+      "default": "todo-app",
+      "description": "Kubernetes namespace for all resources"
+    },
+    "environment": {
+      "type": "string",
+      "enum": ["development", "staging", "production"],
+      "default": "development",
+      "description": "Deployment environment"
+    },
+    "backend": {
+      "type": "object",
+      "description": "Backend service configuration",
+      "properties": {
+        "name": {
+          "type": "string",
+          "default": "todo-backend"
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 1
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": {
+              "type": "string",
+              "default": "todo-backend"
+            },
+            "tag": {
+              "type": "string",
+              "default": "local"
+            },
+            "pullPolicy": {
+              "type": "string",
+              "enum": ["Always", "IfNotPresent", "Never"],
+              "default": "Never"
+            }
+          },
+          "required": ["repository", "tag"]
+        },
+        "service": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["ClusterIP", "NodePort", "LoadBalancer"],
+              "default": "ClusterIP"
+            },
+            "port": {
+              "type": "integer",
+              "default": 8000
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "requests": {
+              "type": "object",
+              "properties": {
+                "memory": { "type": "string", "default": "128Mi" },
+                "cpu": { "type": "string", "default": "100m" }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "memory": { "type": "string", "default": "512Mi" },
+                "cpu": { "type": "string", "default": "500m" }
+              }
+            }
+          }
+        },
+        "config": {
+          "type": "object",
+          "description": "Non-sensitive configuration (ConfigMap)",
+          "properties": {
+            "LOG_LEVEL": { "type": "string", "default": "INFO" },
+            "PORT": { "type": "string", "default": "8000" },
+            "HOST": { "type": "string", "default": "0.0.0.0" },
+            "CORS_ORIGINS": { "type": "string" }
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "description": "Sensitive configuration (Secret)",
+          "properties": {
+            "DATABASE_URL": { "type": "string" },
+            "OPENAI_API_KEY": { "type": "string" }
+          }
+        },
+        "probes": {
+          "type": "object",
+          "properties": {
+            "liveness": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string", "default": "/health" },
+                "initialDelaySeconds": { "type": "integer", "default": 30 },
+                "periodSeconds": { "type": "integer", "default": 10 }
+              }
+            },
+            "readiness": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string", "default": "/health" },
+                "initialDelaySeconds": { "type": "integer", "default": 10 },
+                "periodSeconds": { "type": "integer", "default": 5 }
+              }
+            }
+          }
+        }
+      },
+      "required": ["name", "image"]
+    },
+    "frontend": {
+      "type": "object",
+      "description": "Frontend service configuration",
+      "properties": {
+        "name": {
+          "type": "string",
+          "default": "todo-frontend"
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 1
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": {
+              "type": "string",
+              "default": "todo-frontend"
+            },
+            "tag": {
+              "type": "string",
+              "default": "local"
+            },
+            "pullPolicy": {
+              "type": "string",
+              "enum": ["Always", "IfNotPresent", "Never"],
+              "default": "Never"
+            }
+          },
+          "required": ["repository", "tag"]
+        },
+        "service": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["ClusterIP", "NodePort", "LoadBalancer"],
+              "default": "NodePort"
+            },
+            "port": {
+              "type": "integer",
+              "default": 3000
+            },
+            "nodePort": {
+              "type": "integer",
+              "minimum": 30000,
+              "maximum": 32767,
+              "default": 30000
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "requests": {
+              "type": "object",
+              "properties": {
+                "memory": { "type": "string", "default": "128Mi" },
+                "cpu": { "type": "string", "default": "100m" }
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "memory": { "type": "string", "default": "512Mi" },
+                "cpu": { "type": "string", "default": "500m" }
+              }
+            }
+          }
+        },
+        "config": {
+          "type": "object",
+          "description": "Frontend configuration (ConfigMap)",
+          "properties": {
+            "NEXT_PUBLIC_API_URL": { "type": "string" }
+          }
+        },
+        "probes": {
+          "type": "object",
+          "properties": {
+            "liveness": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string", "default": "/" },
+                "initialDelaySeconds": { "type": "integer", "default": 30 },
+                "periodSeconds": { "type": "integer", "default": 10 }
+              }
+            },
+            "readiness": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string", "default": "/" },
+                "initialDelaySeconds": { "type": "integer", "default": 10 },
+                "periodSeconds": { "type": "integer", "default": 5 }
+              }
+            }
+          }
+        }
+      },
+      "required": ["name", "image"]
+    }
+  },
+  "required": ["backend", "frontend"]
+}

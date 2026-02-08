@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.backend.name }}-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "todo-app.backend.labels" . | nindent 4 }}
+data:
+  LOG_LEVEL: {{ .Values.backend.config.LOG_LEVEL | quote }}
+  PORT: {{ .Values.backend.config.PORT | quote }}
+  HOST: {{ .Values.backend.config.HOST | quote }}
+  CORS_ORIGINS: {{ .Values.backend.config.CORS_ORIGINS | quote }}

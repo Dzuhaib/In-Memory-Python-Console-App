@@ -1,0 +1,82 @@
+# Default values for todo-app Helm chart
+# This is a YAML-formatted file.
+
+# Global settings
+namespace: todo-app
+environment: development
+
+# Backend configuration
+backend:
+  name: todo-backend
+  replicas: 1
+  image:
+    repository: todo-backend
+    tag: local
+    pullPolicy: Never
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  config:
+    LOG_LEVEL: "INFO"
+    PORT: "8000"
+    HOST: "0.0.0.0"
+    CORS_ORIGINS: "http://frontend-service:3000"
+  # Secrets - should be provided via --set or external secret management
+  secrets:
+    DATABASE_URL: ""
+    OPENAI_API_KEY: ""
+  probes:
+    liveness:
+      path: /health
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readiness:
+      path: /health
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 3
+
+# Frontend configuration
+frontend:
+  name: todo-frontend
+  replicas: 1
+  image:
+    repository: todo-frontend
+    tag: local
+    pullPolicy: Never
+  service:
+    type: NodePort
+    port: 3000
+    nodePort: 30000
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  config:
+    NEXT_PUBLIC_API_URL: "http://backend-service:8000/api/v1"
+  probes:
+    liveness:
+      path: /
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readiness:
+      path: /
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 3

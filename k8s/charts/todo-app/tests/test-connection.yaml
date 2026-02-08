@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "todo-app.fullname" . }}-test-connection"
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "todo-app.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  containers:
+    - name: test-backend
+      image: busybox:1.36
+      command: ['sh', '-c']
+      args:
+        - |
+          echo "Testing backend connectivity..."
+          wget --spider --timeout=10 http://backend-service:{{ .Values.backend.service.port }}/health
+          if [ $? -eq 0 ]; then
+            echo "Backend health check: PASSED"
+          else
+            echo "Backend health check: FAILED"
+            exit 1
+          fi
+    - name: test-frontend
+      image: busybox:1.36
+      command: ['sh', '-c']
+      args:
+        - |
+          echo "Testing frontend connectivity..."
+          wget --spider --timeout=10 http://frontend-service:{{ .Values.frontend.service.port }}/
+          if [ $? -eq 0 ]; then
+            echo "Frontend health check: PASSED"
+          else
+            echo "Frontend health check: FAILED"
+            exit 1
+          fi
+  restartPolicy: Never

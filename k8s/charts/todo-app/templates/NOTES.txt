@@ -1,0 +1,47 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your release is named: {{ .Release.Name }}
+Namespace: {{ .Values.namespace }}
+
+== Getting Started ==
+
+1. Get the application URL:
+{{- if eq .Values.frontend.service.type "NodePort" }}
+   export NODE_PORT=$(kubectl get --namespace {{ .Values.namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services frontend-service)
+   export NODE_IP=$(kubectl get nodes --namespace {{ .Values.namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+   echo "Frontend URL: http://$NODE_IP:$NODE_PORT"
+{{- else if eq .Values.frontend.service.type "LoadBalancer" }}
+   NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+   kubectl get --namespace {{ .Values.namespace }} svc frontend-service -w
+{{- else }}
+   kubectl port-forward --namespace {{ .Values.namespace }} svc/frontend-service {{ .Values.frontend.service.port }}:{{ .Values.frontend.service.port }}
+   echo "Frontend URL: http://localhost:{{ .Values.frontend.service.port }}"
+{{- end }}
+
+2. Check pod status:
+   kubectl get pods --namespace {{ .Values.namespace }} -l "app=todo-app"
+
+3. View logs:
+   kubectl logs --namespace {{ .Values.namespace }} -l "component=backend" -f
+   kubectl logs --namespace {{ .Values.namespace }} -l "component=frontend" -f
+
+4. For Minikube users:
+   minikube service frontend-service --namespace {{ .Values.namespace }}
+
+== Configuration ==
+
+Backend API: http://backend-service:{{ .Values.backend.service.port }}
+Frontend: http://frontend-service:{{ .Values.frontend.service.port }}
+
+== Secrets ==
+
+Make sure you have created the required secrets:
+   kubectl create secret generic {{ .Values.backend.name }}-secrets \
+     --namespace {{ .Values.namespace }} \
+     --from-literal=DATABASE_URL=<your-database-url> \
+     --from-literal=OPENAI_API_KEY=<your-openai-key>
+
+Or provide them via Helm values:
+   helm upgrade {{ .Release.Name }} ./k8s/charts/todo-app \
+     --set backend.secrets.DATABASE_URL=<your-database-url> \
+     --set backend.secrets.OPENAI_API_KEY=<your-openai-key>

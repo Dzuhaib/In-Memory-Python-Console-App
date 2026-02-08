@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: todo-app
+  labels:
+    app: todo-app
+    component: backend
+data:
+  LOG_LEVEL: "INFO"
+  PORT: "8000"
+  HOST: "0.0.0.0"
+  CORS_ORIGINS: "http://frontend-service:3000"
