@@ -1,5 +1,6 @@
 """Task API endpoints."""
 
+import traceback
 from datetime import datetime
 from typing import List, Optional
 
@@ -12,6 +13,19 @@ from schemas.task import AddTagRequest, CreateTaskRequest, UpdateTaskRequest
 from services.task_service import TaskService
 
 router = APIRouter()
+
+
+def task_to_dict(t: Task) -> dict:
+    """Safely serialize a Task to a dict."""
+    return {
+        "id": t.id,
+        "title": t.title,
+        "completed": t.completed,
+        "priority": t.priority.value if hasattr(t.priority, 'value') else t.priority,
+        "tags": t.tags if t.tags else [],
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+    }
 
 
 def get_task_service(session: Session = Depends(get_session)) -> TaskService:
@@ -29,7 +43,6 @@ def list_tasks(
     service: TaskService = Depends(get_task_service),
 ):
     """List all tasks with optional filtering, searching, and sorting."""
-    import traceback
     try:
         tasks = service.list_tasks(
             search=search,
@@ -38,18 +51,7 @@ def list_tasks(
             tag=tag,
             sort_by=sort,
         )
-        return [
-            {
-                "id": t.id,
-                "title": t.title,
-                "completed": t.completed,
-                "priority": t.priority.value if hasattr(t.priority, 'value') else t.priority,
-                "tags": t.tags or [],
-                "created_at": t.created_at.isoformat() if t.created_at else None,
-                "updated_at": t.updated_at.isoformat() if t.updated_at else None,
-            }
-            for t in tasks
-        ]
+        return [task_to_dict(t) for t in tasks]
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -61,11 +63,16 @@ def create_task(
     service: TaskService = Depends(get_task_service),
 ):
     """Create a new task."""
-    return service.create_task(
-        title=request.title,
-        priority=request.priority,
-        tags=request.tags,
-    )
+    try:
+        task = service.create_task(
+            title=request.title,
+            priority=request.priority,
+            tags=request.tags,
+        )
+        return task_to_dict(task)
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/tasks/{task_id}")
@@ -74,10 +81,16 @@ def get_task(
     service: TaskService = Depends(get_task_service),
 ):
     """Get a single task by ID."""
-    task = service.get_task(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task
+    try:
+        task = service.get_task(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return task_to_dict(task)
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.put("/tasks/{task_id}")
@@ -87,17 +100,22 @@ def update_task(
     service: TaskService = Depends(get_task_service),
 ):
     """Update an existing task."""
-    if request.title is None and request.priority is None:
-        raise HTTPException(status_code=400, detail="No changes specified")
-
-    task = service.update_task(
-        task_id=task_id,
-        title=request.title,
-        priority=request.priority,
-    )
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task
+    try:
+        if request.title is None and request.priority is None:
+            raise HTTPException(status_code=400, detail="No changes specified")
+        task = service.update_task(
+            task_id=task_id,
+            title=request.title,
+            priority=request.priority,
+        )
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return task_to_dict(task)
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/tasks/{task_id}", status_code=204)
@@ -117,10 +135,16 @@ def toggle_complete(
     service: TaskService = Depends(get_task_service),
 ):
     """Toggle the completion status of a task."""
-    task = service.toggle_complete(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task
+    try:
+        task = service.toggle_complete(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return task_to_dict(task)
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/tasks/{task_id}/tags")
@@ -130,10 +154,16 @@ def add_tag(
     service: TaskService = Depends(get_task_service),
 ):
     """Add a tag to a task."""
-    task = service.add_tag(task_id, request.tag)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task
+    try:
+        task = service.add_tag(task_id, request.tag)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return task_to_dict(task)
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/tasks/{task_id}/tags/{tag}")
@@ -143,10 +173,16 @@ def remove_tag(
     service: TaskService = Depends(get_task_service),
 ):
     """Remove a tag from a task."""
-    task = service.remove_tag(task_id, tag)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task
+    try:
+        task = service.remove_tag(task_id, tag)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return task_to_dict(task)
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/health")
