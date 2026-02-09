@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "todo-chatbot.fullname" . }}-test-backend"
+  labels:
+    {{- include "todo-chatbot.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['{{ include "todo-chatbot.backend.fullname" . }}:{{ .Values.backend.service.port }}/health']
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "todo-chatbot.fullname" . }}-test-frontend"
+  labels:
+    {{- include "todo-chatbot.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['{{ include "todo-chatbot.frontend.fullname" . }}:{{ .Values.frontend.service.port }}']
+  restartPolicy: Never

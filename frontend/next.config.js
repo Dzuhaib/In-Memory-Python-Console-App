@@ -1,8 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Enable standalone output for Docker deployment
   output: 'standalone',
+  experimental: {
+    serverComponentsExternalPackages: ['better-auth', '@neondatabase/serverless'],
+  },
 }
 
 module.exports = nextConfig

@@ -8,51 +8,31 @@ __pycache__
 *.pyo
 *.pyd
 .Python
-*.egg-info
-.eggs
-*.egg
-.venv
-venv
-ENV
-env
-.pytest_cache
+*.so
+.pytest_cache/
 .coverage
-htmlcov
-.tox
-.nox
+htmlcov/
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Environment
+.env
+.env.local
+.env.*.local
 
 # IDE
-.idea
-.vscode
+.vscode/
+.idea/
 *.swp
 *.swo
 
-# Testing
+# Tests
 tests/
-*.test.py
-conftest.py
-
-# Documentation
-docs/
-*.md
-!README.md
-
-# Environment files (secrets should be injected at runtime)
-.env
-.env.*
-*.local
-
-# Build artifacts
-dist/
-build/
-
-# Docker
-Dockerfile
-.dockerignore
-docker-compose*.yml
+**/test_*.py
 
 # Misc
+*.md
 *.log
-*.tmp
-.DS_Store
-Thumbs.db

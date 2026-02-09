@@ -1,0 +1,38 @@
+===============================================================
+  ClawList Todo Chatbot - Deployment Summary
+===============================================================
+
+PREREQUISITE: Load images into Minikube first:
+  minikube image load clawlist-backend:latest
+  minikube image load clawlist-frontend:latest
+
+SERVICES:
+  Backend  (FastAPI):  {{ include "todo-chatbot.backend.fullname" . }}  → port {{ .Values.backend.service.port }}
+  Frontend (Next.js):  {{ include "todo-chatbot.frontend.fullname" . }} → port {{ .Values.frontend.service.port }}
+
+ACCESS THE APPLICATION:
+
+  Option 1: kubectl port-forward (recommended for local dev)
+
+    # Terminal 1 - Backend API on localhost:8000
+    kubectl port-forward svc/{{ include "todo-chatbot.backend.fullname" . }} 8000:{{ .Values.backend.service.port }} --namespace {{ .Release.Namespace }}
+
+    # Terminal 2 - Frontend on localhost:3000
+    kubectl port-forward svc/{{ include "todo-chatbot.frontend.fullname" . }} 3000:{{ .Values.frontend.service.port }} --namespace {{ .Release.Namespace }}
+
+    Then open: http://localhost:3000
+
+{{- if .Values.ingress.enabled }}
+
+  Option 2: Ingress (requires: minikube addons enable ingress)
+
+    Add to /etc/hosts:  $(minikube ip) {{ .Values.ingress.host }}
+    Then open: http://{{ .Values.ingress.host }}
+{{- end }}
+
+  Option 3: minikube service
+
+    minikube service {{ include "todo-chatbot.backend.fullname" . }} --namespace {{ .Release.Namespace }}
+    minikube service {{ include "todo-chatbot.frontend.fullname" . }} --namespace {{ .Release.Namespace }}
+
+===============================================================

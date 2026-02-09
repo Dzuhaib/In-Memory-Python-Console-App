@@ -1,0 +1,112 @@
+# =============================================================================
+# ClawList Todo Chatbot - Helm Values for Local Minikube Deployment
+# =============================================================================
+
+# -- Backend (FastAPI + Uvicorn)
+backend:
+  replicaCount: 1
+  image:
+    repository: clawlist-backend
+    tag: latest
+    pullPolicy: Never  # Use local images loaded into Minikube
+  service:
+    type: ClusterIP
+    port: 8000
+  containerPort: 8000
+  startupProbe:
+    httpGet:
+      path: /health
+      port: http
+    failureThreshold: 30
+    periodSeconds: 5
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: http
+    periodSeconds: 30
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: http
+    periodSeconds: 10
+    failureThreshold: 3
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+# -- Frontend (Next.js)
+frontend:
+  replicaCount: 1
+  image:
+    repository: clawlist-frontend
+    tag: latest
+    pullPolicy: Never  # Use local images loaded into Minikube
+  service:
+    type: ClusterIP
+    port: 3000
+  containerPort: 3000
+  startupProbe:
+    httpGet:
+      path: /
+      port: http
+    failureThreshold: 30
+    periodSeconds: 5
+  livenessProbe:
+    httpGet:
+      path: /
+      port: http
+    periodSeconds: 30
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /
+      port: http
+    periodSeconds: 10
+    failureThreshold: 3
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# -- Shared environment variables (stored in a Kubernetes Secret)
+env:
+  DATABASE_URL: "postgresql://user:password@host:5432/dbname?sslmode=require"
+  OPENAI_API_KEY: "sk-your-openai-api-key-here"
+  BETTER_AUTH_SECRET: "your-better-auth-secret-here"
+
+# -- Backend-specific env (non-secret)
+backendEnv:
+  PORT: "8000"
+  HOST: "0.0.0.0"
+  LOG_LEVEL: "INFO"
+  CORS_ORIGINS: "http://localhost:3000"
+
+# -- Frontend-specific env (non-secret)
+frontendEnv:
+  BETTER_AUTH_URL: "http://localhost:3000"
+  NEXT_PUBLIC_API_URL: "http://localhost:8000/api/v1"
+
+# -- Ingress (nginx - enable Minikube addon: minikube addons enable ingress)
+ingress:
+  enabled: false
+  className: nginx
+  host: todo-chatbot.local
+
+# -- Service Account
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

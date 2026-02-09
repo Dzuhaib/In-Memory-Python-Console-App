@@ -1,17 +1,17 @@
 # Core dependencies
-fastapi==0.109.2
-uvicorn[standard]==0.27.1
-sqlmodel==0.0.14
-psycopg2-binary==2.9.9
-pydantic==2.6.1
-pydantic-settings==2.1.0
-python-dotenv==1.0.1
+fastapi>=0.109.2
+uvicorn[standard]>=0.27.1
+sqlmodel>=0.0.14
+psycopg2-binary>=2.9.9
+pydantic>=2.6.1
+pydantic-settings>=2.1.0
+python-dotenv>=1.0.1
 
 # AI dependencies (OpenAI Agents SDK for chatbot)
-openai-agents>=0.0.3
+openai-agents>=0.7.0
 
 # Development dependencies (not included in production image)
-# pytest==7.4.4
-# pytest-asyncio==0.23.4
-# httpx==0.26.0
-# pytest-cov==4.1.0
+# pytest>=7.4.4
+# pytest-asyncio>=0.23.4
+# httpx>=0.26.0
+# pytest-cov>=4.1.0

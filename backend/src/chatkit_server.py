@@ -208,11 +208,21 @@ async def handle_chat_message(user_message: str) -> AsyncIterator[str]:
 
 async def chat_endpoint(request: Request):
     """Simple chat endpoint that accepts a message and streams the response."""
-    body = await request.json()
+    import sys
+    import traceback
+
+    try:
+        body = await request.json()
+    except Exception:
+        return {"error": "Invalid JSON body"}
+
     user_message = body.get("message", "")
 
     if not user_message:
         return {"error": "Message is required"}
+
+    if not api_key:
+        return {"error": "OpenAI API key is not configured"}
 
     async def generate():
         try:
@@ -221,10 +231,14 @@ async def chat_endpoint(request: Request):
             yield "data: [DONE]\n\n"
         except Exception as e:
             error_msg = str(e)
+            print(f"Chat error: {error_msg}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
             if "quota" in error_msg.lower():
                 error_msg = "OpenAI API quota exceeded. Please check your billing details."
             elif "api key" in error_msg.lower() or "authentication" in error_msg.lower():
                 error_msg = "OpenAI API key is invalid or not configured."
+            elif "could not" in error_msg.lower() or "connection" in error_msg.lower():
+                error_msg = "Could not connect to OpenAI. Please try again."
             yield f"data: {json.dumps({'error': error_msg})}\n\n"
             yield "data: [DONE]\n\n"
 
