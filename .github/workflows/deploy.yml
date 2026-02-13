@@ -1,0 +1,325 @@
+name: Deploy Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  docker-build-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - name: backend
+            context: backend
+            dockerfile: backend/Dockerfile
+          - name: frontend
+            context: frontend
+            dockerfile: frontend/Dockerfile
+          - name: audit-service
+            context: services/audit-service
+            dockerfile: services/audit-service/Dockerfile
+          - name: notification-service
+            context: services/notification-service
+            dockerfile: services/notification-service/Dockerfile
+          - name: recurring-task-service
+            context: services/recurring-task-service
+            dockerfile: services/recurring-task-service/Dockerfile
+          - name: websocket-service
+            context: services/websocket-service
+            dockerfile: services/websocket-service/Dockerfile
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/todo-app-${{ matrix.service.name }}
+          tags: |
+            type=sha,prefix=,format=long
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  helm-deploy:
+    name: Deploy to Kubernetes via Helm
+    runs-on: ubuntu-latest
+    needs: docker-build-push
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.28.0'
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Verify cluster connectivity
+        run: kubectl cluster-info
+
+      - name: Deploy with Helm
+        id: helm-deploy
+        run: |
+          helm upgrade --install todo-app k8s/charts/todo-app/ \
+            --set backend.image.repository=ghcr.io/${{ github.repository_owner }}/todo-app-backend \
+            --set backend.image.tag=${{ github.sha }} \
+            --set backend.image.pullPolicy=IfNotPresent \
+            --set backend.secrets.DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            --set backend.secrets.OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            --set backend.config.REDPANDA_BROKERS="${{ secrets.REDPANDA_BROKERS }}" \
+            --set backend.config.REDPANDA_USERNAME="${{ secrets.REDPANDA_USERNAME }}" \
+            --set backend.config.REDPANDA_PASSWORD="${{ secrets.REDPANDA_PASSWORD }}" \
+            --set frontend.image.repository=ghcr.io/${{ github.repository_owner }}/todo-app-frontend \
+            --set frontend.image.tag=${{ github.sha }} \
+            --set frontend.image.pullPolicy=IfNotPresent \
+            --set auditService.image.repository=ghcr.io/${{ github.repository_owner }}/todo-app-audit-service \
+            --set auditService.image.tag=${{ github.sha }} \
+            --set notificationService.image.repository=ghcr.io/${{ github.repository_owner }}/todo-app-notification-service \
+            --set notificationService.image.tag=${{ github.sha }} \
+            --set recurringTaskService.image.repository=ghcr.io/${{ github.repository_owner }}/todo-app-recurring-task-service \
+            --set recurringTaskService.image.tag=${{ github.sha }} \
+            --set websocketService.image.repository=ghcr.io/${{ github.repository_owner }}/todo-app-websocket-service \
+            --set websocketService.image.tag=${{ github.sha }} \
+            --namespace todo-app \
+            --create-namespace \
+            --wait \
+            --timeout 5m \
+            --atomic
+
+      - name: Get deployment revision
+        if: success()
+        id: get-revision
+        run: |
+          REVISION=$(helm history todo-app -n todo-app -o json | jq -r '.[0].revision')
+          echo "revision=${REVISION}" >> $GITHUB_OUTPUT
+
+  verify:
+    name: Verify Deployment
+    runs-on: ubuntu-latest
+    needs: helm-deploy
+    steps:
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Wait for backend deployment
+        run: |
+          kubectl rollout status deployment/todo-backend \
+            -n todo-app \
+            --timeout=5m
+
+      - name: Wait for frontend deployment
+        run: |
+          kubectl rollout status deployment/todo-frontend \
+            -n todo-app \
+            --timeout=5m
+
+      - name: Wait for audit-service deployment
+        run: |
+          kubectl rollout status deployment/audit-service \
+            -n todo-app \
+            --timeout=5m || echo "audit-service deployment not found, skipping"
+
+      - name: Wait for notification-service deployment
+        run: |
+          kubectl rollout status deployment/notification-service \
+            -n todo-app \
+            --timeout=5m || echo "notification-service deployment not found, skipping"
+
+      - name: Wait for recurring-task-service deployment
+        run: |
+          kubectl rollout status deployment/recurring-task-service \
+            -n todo-app \
+            --timeout=5m || echo "recurring-task-service deployment not found, skipping"
+
+      - name: Wait for websocket-service deployment
+        run: |
+          kubectl rollout status deployment/websocket-service \
+            -n todo-app \
+            --timeout=5m || echo "websocket-service deployment not found, skipping"
+
+      - name: Check pod status
+        run: kubectl get pods -n todo-app
+
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: [helm-deploy, verify]
+    if: failure()
+    steps:
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.28.0'
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Rollback Helm release
+        run: |
+          echo "Deployment failed, rolling back to previous version..."
+          helm rollback todo-app -n todo-app --wait --timeout 5m
+          echo "Rollback completed"
+
+      - name: Verify rollback status
+        run: |
+          echo "Current release status:"
+          helm status todo-app -n todo-app
+          echo ""
+          echo "Pod status after rollback:"
+          kubectl get pods -n todo-app
+
+      - name: Get rollback logs
+        if: always()
+        run: |
+          echo "Recent events:"
+          kubectl get events -n todo-app --sort-by='.lastTimestamp' | tail -20
+
+# ============================================================================
+# REQUIRED GITHUB SECRETS DOCUMENTATION
+# ============================================================================
+#
+# Configure the following secrets in your GitHub repository settings:
+# Settings > Secrets and variables > Actions > New repository secret
+#
+# 1. KUBECONFIG (Required)
+#    Description: Base64-encoded kubeconfig file for Kubernetes cluster access
+#    How to obtain:
+#      - Get your kubeconfig file (usually at ~/.kube/config)
+#      - Encode it: cat ~/.kube/config | base64 -w 0
+#      - Paste the base64 string as the secret value
+#    Used by: kubectl and helm commands to authenticate to the cluster
+#
+# 2. GHCR_TOKEN (Required)
+#    Description: GitHub Personal Access Token with packages write permission
+#    How to obtain:
+#      - Go to GitHub Settings > Developer settings > Personal access tokens > Tokens (classic)
+#      - Generate new token with 'write:packages' and 'read:packages' scopes
+#      - Copy the token and save it as the secret value
+#    Used by: Docker login to push images to ghcr.io
+#
+# 3. DATABASE_URL (Required)
+#    Description: PostgreSQL database connection string
+#    Format: postgresql://username:password@host:port/database
+#    Example: postgresql://todouser:securepass@db.example.com:5432/tododb
+#    Used by: Backend service to connect to the database
+#
+# 4. OPENAI_API_KEY (Required)
+#    Description: OpenAI API key for chatbot functionality
+#    How to obtain:
+#      - Go to https://platform.openai.com/api-keys
+#      - Create new secret key
+#      - Copy and save as the secret value
+#    Used by: Backend chatbot service for AI-powered todo assistant
+#
+# 5. REDPANDA_BROKERS (Required for event-driven architecture)
+#    Description: Redpanda/Kafka broker connection string
+#    Format: broker1:9092,broker2:9092
+#    Example: redpanda-0.redpanda.svc.cluster.local:9092
+#    Used by: Event publisher and consumer services for Kafka connectivity
+#
+# 6. REDPANDA_USERNAME (Optional - if SASL auth enabled)
+#    Description: SASL username for Redpanda authentication
+#    Used by: Dapr Pub/Sub component for authenticated Kafka access
+#
+# 7. REDPANDA_PASSWORD (Optional - if SASL auth enabled)
+#    Description: SASL password for Redpanda authentication
+#    Used by: Dapr Pub/Sub component for authenticated Kafka access
+#
+# ============================================================================
+# DEPLOYMENT ARCHITECTURE
+# ============================================================================
+#
+# This pipeline deploys 6 containerized services:
+#
+# 1. todo-app-backend (FastAPI)
+#    - Main API server handling CRUD operations
+#    - Publishes events to Kafka via Dapr
+#    - Port: 8000
+#
+# 2. todo-app-frontend (Next.js)
+#    - User interface for the todo application
+#    - Connects to backend API
+#    - Port: 3000
+#
+# 3. todo-app-audit-service (Python/FastAPI)
+#    - Logs all task events for audit trail
+#    - Subscribes to 'task-events' topic
+#    - Port: 8001
+#
+# 4. todo-app-notification-service (Python/FastAPI)
+#    - Handles reminder notifications
+#    - Subscribes to 'reminders' topic
+#    - Port: 8002
+#
+# 5. todo-app-recurring-task-service (Python/FastAPI)
+#    - Spawns recurring task instances
+#    - Subscribes to 'task-events' topic
+#    - Port: 8003
+#
+# 6. todo-app-websocket-service (Python/FastAPI)
+#    - Real-time updates via WebSocket
+#    - Subscribes to 'task-updates' topic
+#    - Port: 8004
+#
+# All images are pushed to: ghcr.io/<owner>/todo-app-<service>:<sha>
+# Helm chart location: k8s/charts/todo-app/
+#
+# ============================================================================

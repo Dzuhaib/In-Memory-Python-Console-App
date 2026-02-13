@@ -1,0 +1,176 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-python:
+    name: Python Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run ruff on backend
+        run: ruff check backend/
+
+      - name: Run ruff on services
+        run: |
+          ruff check services/audit-service/
+          ruff check services/notification-service/
+          ruff check services/recurring-task-service/
+          ruff check services/websocket-service/
+
+  lint-typescript:
+    name: TypeScript Lint (eslint)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: frontend
+        run: npm run lint
+
+  test-python:
+    name: Python Tests (pytest)
+    runs-on: ubuntu-latest
+    needs: lint-python
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio
+
+      - name: Run pytest
+        working-directory: backend
+        run: pytest -v --cov=src --cov-report=term-missing
+        env:
+          DATABASE_URL: sqlite:///test.db
+          OPENAI_API_KEY: test-key
+
+  test-typescript:
+    name: TypeScript Tests (jest)
+    runs-on: ubuntu-latest
+    needs: lint-typescript
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run Jest tests
+        working-directory: frontend
+        run: npm test -- --ci --coverage
+
+  docker-build:
+    name: Docker Build Verification
+    runs-on: ubuntu-latest
+    needs: [test-python, test-typescript]
+    strategy:
+      matrix:
+        service:
+          - name: backend
+            context: backend
+            dockerfile: backend/Dockerfile
+          - name: frontend
+            context: frontend
+            dockerfile: frontend/Dockerfile
+          - name: audit-service
+            context: services/audit-service
+            dockerfile: services/audit-service/Dockerfile
+          - name: notification-service
+            context: services/notification-service
+            dockerfile: services/notification-service/Dockerfile
+          - name: recurring-task-service
+            context: services/recurring-task-service
+            dockerfile: services/recurring-task-service/Dockerfile
+          - name: websocket-service
+            context: services/websocket-service
+            dockerfile: services/websocket-service/Dockerfile
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image for ${{ matrix.service.name }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: false
+          tags: ${{ matrix.service.name }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  helm-lint:
+    name: Helm Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: Lint Helm chart
+        run: helm lint k8s/charts/todo-app/
+
+      - name: Validate Helm templates
+        run: |
+          helm template todo-app k8s/charts/todo-app/ \
+            --set backend.secrets.DATABASE_URL=test \
+            --set backend.secrets.OPENAI_API_KEY=test \
+            --dry-run --debug

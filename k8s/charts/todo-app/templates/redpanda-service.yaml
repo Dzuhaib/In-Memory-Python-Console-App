@@ -1,0 +1,25 @@
+# T066: Redpanda Service - ClusterIP for internal Kafka access
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.redpanda.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: todo-app
+    component: redpanda
+    tier: infrastructure
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for StatefulSet
+  selector:
+    app: todo-app
+    component: redpanda
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: 9092
+      protocol: TCP
+    - name: admin
+      port: 8082
+      targetPort: 8082
+      protocol: TCP

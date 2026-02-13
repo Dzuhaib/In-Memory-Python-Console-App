@@ -1,5 +1,8 @@
 # Todo App Hackathon Requirements
 
+![CI Pipeline](https://github.com/Dzuhaib/In-Memory-Python-Console-App/actions/workflows/ci.yml/badge.svg)
+![Deploy Pipeline](https://github.com/Dzuhaib/In-Memory-Python-Console-App/actions/workflows/deploy.yml/badge.svg)
+
 ## Basic Level (Core Essentials)
 These form the foundation - quick to build, essential for any MVP:
 https://github.com/Dzuhaib/In-Memory-Python-Console-App.git
@@ -40,8 +43,10 @@ Add these to make the app feel polished and practical:
 - **Goal**: Containerized deployment with Kubernetes orchestration
 
 ### Phase 5: Advanced Cloud Deployment
-- **Tech Stack**: Kafka, Dapr, DigitalOcean DOKS
-- **Goal**: Scalable cloud-native architecture with event streaming
+- **Tech Stack**: Kafka/Redpanda, Dapr, Kubernetes (Minikube + OKE/AKS/GKE), GitHub Actions CI/CD
+- **Goal**: Event-driven microservices architecture with recurring tasks, due dates, reminders, Dapr integration, and production cloud deployment
+- **Services**: Backend API, Frontend, 4 consumer microservices (audit, notification, recurring-task, websocket)
+- **Architecture**: Dapr Pub/Sub (Kafka), Dapr Jobs API (reminders), Dapr Secrets (K8s), WebSocket real-time updates
 
 ## Bonus Features (Create when needed)
 

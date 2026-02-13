@@ -1,3 +1,4 @@
+# Task T001: Add httpx to backend/requirements.txt for Dapr HTTP client communication
 # Core dependencies
 fastapi>=0.109.2
 uvicorn[standard]>=0.27.1
@@ -6,6 +7,8 @@ psycopg2-binary>=2.9.9
 pydantic>=2.6.1
 pydantic-settings>=2.1.0
 python-dotenv>=1.0.1
+httpx>=0.26.0
+python-dateutil>=2.8.2
 
 # AI dependencies (OpenAI Agents SDK for chatbot)
 openai-agents>=0.7.0

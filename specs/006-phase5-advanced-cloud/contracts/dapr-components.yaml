@@ -1,0 +1,86 @@
+# Dapr Component Contracts for Phase 5
+# These define the Dapr building blocks used by the application.
+# Actual component YAML files will be created in dapr-components/ at repo root.
+
+---
+# 1. Pub/Sub Component (Kafka via Redpanda)
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: kafka-pubsub
+spec:
+  type: pubsub.kafka
+  version: v1
+  metadata:
+    - name: brokers
+      value: "redpanda:9092"  # Local: redpanda service in cluster
+    - name: consumerGroup
+      value: "todo-service"
+    - name: authType
+      value: "none"  # Local: no auth. Cloud: SASL_SSL
+
+---
+# 2. State Store Component (PostgreSQL)
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: statestore
+spec:
+  type: state.postgresql
+  version: v1
+  metadata:
+    - name: connectionString
+      secretKeyRef:
+        name: database-url
+        key: DATABASE_URL
+
+---
+# 3. Secrets Store Component (Kubernetes Secrets)
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: kubernetes-secrets
+spec:
+  type: secretstores.kubernetes
+  version: v1
+
+---
+# 4. Pub/Sub Subscriptions Contract
+# Each consumer service declares its subscriptions via GET /dapr/subscribe
+
+# notification-service subscriptions:
+#   - pubsubname: kafka-pubsub
+#     topic: reminders
+#     route: /api/events/reminders
+
+# recurring-task-service subscriptions:
+#   - pubsubname: kafka-pubsub
+#     topic: task-events
+#     route: /api/events/task-events
+
+# audit-service subscriptions:
+#   - pubsubname: kafka-pubsub
+#     topic: task-events
+#     route: /api/events/task-events
+
+# websocket-service subscriptions:
+#   - pubsubname: kafka-pubsub
+#     topic: task-updates
+#     route: /api/events/task-updates
+
+---
+# 5. Topics Contract
+# topic: task-events
+#   publishers: backend (on task CRUD)
+#   consumers: recurring-task-service, audit-service
+#   message schema: TaskEvent (see api-extensions.yaml)
+#
+# topic: reminders
+#   publishers: backend (via Dapr Jobs callback)
+#   consumers: notification-service
+#   message schema: TaskEvent with event_type=reminder.due
+#
+# topic: task-updates
+#   publishers: backend (on task CRUD)
+#   consumers: websocket-service
+#   message schema: TaskEvent

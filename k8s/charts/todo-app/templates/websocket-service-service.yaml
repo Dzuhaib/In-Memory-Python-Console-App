@@ -1,0 +1,17 @@
+# T074: WebSocket Service Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: websocket-service
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "todo-app.websocketService.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.websocketService.service.type }}
+  selector:
+    {{- include "todo-app.websocketService.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.websocketService.service.port }}
+      targetPort: {{ .Values.websocketService.service.port }}
+      protocol: TCP

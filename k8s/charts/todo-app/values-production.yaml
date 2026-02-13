@@ -1,0 +1,339 @@
+# Production values for todo-app Helm chart
+# Override defaults from values.yaml for cloud deployment
+
+# Global settings
+namespace: todo-app
+environment: production
+
+# Backend configuration
+backend:
+  name: todo-backend
+  replicas: 2  # Production HA with 2 replicas
+  image:
+    repository: ghcr.io/dzuhaib/todo-backend
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  config:
+    LOG_LEVEL: "INFO"
+    PORT: "8000"
+    HOST: "0.0.0.0"
+    CORS_ORIGINS: "https://todo.example.com"  # Replace with your actual domain
+    # Dapr configuration
+    DAPR_HTTP_PORT: "3500"
+    DAPR_GRPC_PORT: "50001"
+    PUBSUB_NAME: "kafka-pubsub"
+    DAPR_ENABLED: "true"
+  # Secrets - should be provided via Kubernetes Secrets externally
+  secrets:
+    DATABASE_URL: ""  # Set via kubectl create secret
+    OPENAI_API_KEY: ""  # Set via kubectl create secret
+  probes:
+    liveness:
+      path: /health
+      initialDelaySeconds: 45
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readiness:
+      path: /health
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+  # Dapr sidecar annotations
+  dapr:
+    enabled: true
+    appId: todo-backend
+    appPort: "8000"
+    logLevel: "info"
+    enableMetrics: true
+    metricsPort: "9090"
+  # Horizontal Pod Autoscaler
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# Frontend configuration
+frontend:
+  name: todo-frontend
+  replicas: 2  # Production HA with 2 replicas
+  image:
+    repository: ghcr.io/dzuhaib/todo-frontend
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  config:
+    NEXT_PUBLIC_API_URL: "https://todo.example.com/api/v1"  # Replace with your actual domain
+    NODE_ENV: "production"
+  probes:
+    liveness:
+      path: /
+      initialDelaySeconds: 45
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readiness:
+      path: /
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+  # Dapr sidecar annotations (optional for frontend)
+  dapr:
+    enabled: false
+  # Horizontal Pod Autoscaler
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+# Consumer Microservices
+notificationService:
+  name: notification-service
+  replicas: 1
+  image:
+    repository: ghcr.io/dzuhaib/notification-service
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 8001
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  dapr:
+    enabled: true
+    appId: notification-service
+    appPort: "8001"
+    logLevel: "info"
+
+recurringTaskService:
+  name: recurring-task-service
+  replicas: 1
+  image:
+    repository: ghcr.io/dzuhaib/recurring-task-service
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 8002
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  dapr:
+    enabled: true
+    appId: recurring-task-service
+    appPort: "8002"
+    logLevel: "info"
+
+auditService:
+  name: audit-service
+  replicas: 1
+  image:
+    repository: ghcr.io/dzuhaib/audit-service
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 8003
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  dapr:
+    enabled: true
+    appId: audit-service
+    appPort: "8003"
+    logLevel: "info"
+
+websocketService:
+  name: websocket-service
+  replicas: 1
+  image:
+    repository: ghcr.io/dzuhaib/websocket-service
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 8004
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  dapr:
+    enabled: true
+    appId: websocket-service
+    appPort: "8004"
+    logLevel: "info"
+
+# Redpanda/Kafka configuration (Cloud Managed)
+kafka:
+  # Set to false to use external cloud-managed Kafka (Redpanda Cloud)
+  deployLocal: false
+  # Cloud Kafka configuration (Redpanda Cloud Serverless or other managed service)
+  cloud:
+    enabled: true
+    # Bootstrap servers - Replace with your Redpanda Cloud bootstrap servers
+    bootstrapServers: "seed-<cluster-id>.cloud.redpanda.com:9092"
+    # SASL authentication (required for cloud)
+    sasl:
+      mechanism: "SCRAM-SHA-256"  # or SCRAM-SHA-512
+      username: ""  # Set via Kubernetes Secret
+      password: ""  # Set via Kubernetes Secret
+    # TLS configuration
+    tls:
+      enabled: true
+    # Topics (will be auto-created by Dapr or pre-created in Redpanda Cloud)
+    topics:
+      - task-events
+      - reminders
+      - task-updates
+
+# Dapr Components Configuration
+dapr:
+  components:
+    # Kafka Pub/Sub component
+    pubsub:
+      name: kafka-pubsub
+      type: pubsub.kafka
+      version: v1
+      # Consumer group for each service
+      consumerGroup: todo-app-consumers
+    # PostgreSQL State Store component
+    statestore:
+      name: postgres-statestore
+      type: state.postgresql
+      version: v1
+    # Kubernetes Secrets Store component
+    secrets:
+      name: kubernetes-secrets
+      type: secretstores.kubernetes
+      version: v1
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # Rate limiting (optional)
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    # CORS headers (optional, if not handled by backend)
+    # nginx.ingress.kubernetes.io/enable-cors: "true"
+    # nginx.ingress.kubernetes.io/cors-allow-origin: "https://todo.example.com"
+  hosts:
+    - host: todo.example.com  # Replace with your actual domain
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service: frontend-service
+            port: 3000
+        - path: /api
+          pathType: Prefix
+          backend:
+            service: backend-service
+            port: 8000
+  tls:
+    - secretName: todo-app-tls
+      hosts:
+        - todo.example.com  # Replace with your actual domain
+
+# Image pull secrets (if using private registry)
+imagePullSecrets: []
+# - name: ghcr-secret
+
+# PostgreSQL (if deploying in-cluster instead of managed service)
+postgresql:
+  enabled: false  # Set to true if deploying PostgreSQL in-cluster
+  auth:
+    username: todouser
+    password: ""  # Set via Kubernetes Secret
+    database: tododb
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+
+# cert-manager (assumes already installed on cluster)
+certManager:
+  clusterIssuer: letsencrypt-prod
+  email: admin@example.com  # Replace with your email for Let's Encrypt notifications
+
+# Monitoring and observability (optional, for future use)
+monitoring:
+  enabled: false
+  prometheus:
+    enabled: false
+  grafana:
+    enabled: false
+  jaeger:
+    enabled: false
+
+# Security settings
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+# Pod disruption budgets (for production HA)
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Network policies (optional, for enhanced security)
+networkPolicies:
+  enabled: false
+
+# Service mesh integration (optional)
+serviceMesh:
+  enabled: false
+  type: ""  # istio, linkerd, etc.

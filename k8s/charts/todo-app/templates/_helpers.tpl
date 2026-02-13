@@ -68,3 +68,71 @@ Frontend labels
 {{ include "todo-app.frontend.selectorLabels" . }}
 tier: web
 {{- end }}
+
+{{/*
+Notification Service selector labels
+*/}}
+{{- define "todo-app.notificationService.selectorLabels" -}}
+app: todo-app
+component: notification-service
+{{- end }}
+
+{{/*
+Notification Service labels
+*/}}
+{{- define "todo-app.notificationService.labels" -}}
+{{ include "todo-app.labels" . }}
+{{ include "todo-app.notificationService.selectorLabels" . }}
+tier: consumer
+{{- end }}
+
+{{/*
+Recurring Task Service selector labels
+*/}}
+{{- define "todo-app.recurringTaskService.selectorLabels" -}}
+app: todo-app
+component: recurring-task-service
+{{- end }}
+
+{{/*
+Recurring Task Service labels
+*/}}
+{{- define "todo-app.recurringTaskService.labels" -}}
+{{ include "todo-app.labels" . }}
+{{ include "todo-app.recurringTaskService.selectorLabels" . }}
+tier: consumer
+{{- end }}
+
+{{/*
+Audit Service selector labels
+*/}}
+{{- define "todo-app.auditService.selectorLabels" -}}
+app: todo-app
+component: audit-service
+{{- end }}
+
+{{/*
+Audit Service labels
+*/}}
+{{- define "todo-app.auditService.labels" -}}
+{{ include "todo-app.labels" . }}
+{{ include "todo-app.auditService.selectorLabels" . }}
+tier: consumer
+{{- end }}
+
+{{/*
+WebSocket Service selector labels
+*/}}
+{{- define "todo-app.websocketService.selectorLabels" -}}
+app: todo-app
+component: websocket-service
+{{- end }}
+
+{{/*
+WebSocket Service labels
+*/}}
+{{- define "todo-app.websocketService.labels" -}}
+{{ include "todo-app.labels" . }}
+{{ include "todo-app.websocketService.selectorLabels" . }}
+tier: consumer
+{{- end }}

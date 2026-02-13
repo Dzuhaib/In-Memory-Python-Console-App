@@ -1,0 +1,55 @@
+# T073: WebSocket Service Deployment with Dapr annotations
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.websocketService.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "todo-app.websocketService.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.websocketService.replicas }}
+  selector:
+    matchLabels:
+      {{- include "todo-app.websocketService.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "todo-app.websocketService.labels" . | nindent 8 }}
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "websocket-service"
+        dapr.io/app-port: "{{ .Values.websocketService.service.port }}"
+        dapr.io/log-level: "info"
+    spec:
+      containers:
+        - name: websocket-service
+          image: "{{ .Values.websocketService.image.repository }}:{{ .Values.websocketService.image.tag }}"
+          imagePullPolicy: {{ .Values.websocketService.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.websocketService.service.port }}
+              name: http
+          env:
+            - name: PORT
+              value: "{{ .Values.websocketService.service.port }}"
+            - name: DAPR_HTTP_PORT
+              value: "3500"
+            - name: PUBSUB_NAME
+              value: "kafka-pubsub"
+          resources:
+            {{- toYaml .Values.websocketService.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.websocketService.service.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.websocketService.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3

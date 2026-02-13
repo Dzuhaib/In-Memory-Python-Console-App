@@ -1,0 +1,15 @@
+# Task T055: Dapr State Store component for PostgreSQL
+# Optional state management via Dapr (not required for Phase 5 but defined for future use)
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: statestore
+  namespace: default
+spec:
+  type: state.postgresql
+  version: v1
+  metadata:
+    - name: connectionString
+      secretKeyRef:
+        name: database-url
+        key: DATABASE_URL

@@ -1,0 +1,17 @@
+# T070: Recurring Task Service Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: recurring-task-service
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "todo-app.recurringTaskService.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.recurringTaskService.service.type }}
+  selector:
+    {{- include "todo-app.recurringTaskService.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.recurringTaskService.service.port }}
+      targetPort: {{ .Values.recurringTaskService.service.port }}
+      protocol: TCP

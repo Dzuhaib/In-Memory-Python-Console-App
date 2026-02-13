@@ -1,0 +1,17 @@
+# T072: Audit Service Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: audit-service
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "todo-app.auditService.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.auditService.service.type }}
+  selector:
+    {{- include "todo-app.auditService.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.auditService.service.port }}
+      targetPort: {{ .Values.auditService.service.port }}
+      protocol: TCP

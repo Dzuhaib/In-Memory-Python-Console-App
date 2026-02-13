@@ -35,6 +35,13 @@ interface UseTasksReturn extends UseTasksState {
   setTagFilter: (tag: string) => void;
   sortBy: string;
   setSortBy: (sort: string) => void;
+  // T036: Due-date filters
+  dueBefore: string;
+  setDueBefore: (date: string) => void;
+  dueAfter: string;
+  setDueAfter: (date: string) => void;
+  overdueOnly: boolean;
+  setOverdueOnly: (overdue: boolean) => void;
 }
 
 export function useTasks(): UseTasksReturn {
@@ -50,6 +57,10 @@ export function useTasks(): UseTasksReturn {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [tagFilter, setTagFilter] = useState('');
   const [sortBy, setSortBy] = useState('id');
+  // T036: Due-date filters
+  const [dueBefore, setDueBefore] = useState('');
+  const [dueAfter, setDueAfter] = useState('');
+  const [overdueOnly, setOverdueOnly] = useState(false);
 
   const fetchTasks = useCallback(async (params?: TaskQueryParams) => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
@@ -72,10 +83,14 @@ export function useTasks(): UseTasksReturn {
     if (statusFilter) params.status = statusFilter as 'complete' | 'incomplete';
     if (priorityFilter) params.priority = priorityFilter as Priority;
     if (tagFilter) params.tag = tagFilter;
-    if (sortBy) params.sort = sortBy as 'priority' | 'alpha' | 'id';
+    if (sortBy) params.sort = sortBy as 'priority' | 'alpha' | 'id' | 'due_date' | 'created_at';
+    // T036: Due-date filters
+    if (dueBefore) params.due_before = dueBefore;
+    if (dueAfter) params.due_after = dueAfter;
+    if (overdueOnly) params.overdue = overdueOnly;
 
     fetchTasks(params);
-  }, [searchTerm, statusFilter, priorityFilter, tagFilter, sortBy, fetchTasks]);
+  }, [searchTerm, statusFilter, priorityFilter, tagFilter, sortBy, dueBefore, dueAfter, overdueOnly, fetchTasks]);
 
   // Listen for tasks-updated event from chat widget
   useEffect(() => {
@@ -85,13 +100,17 @@ export function useTasks(): UseTasksReturn {
       if (statusFilter) params.status = statusFilter as 'complete' | 'incomplete';
       if (priorityFilter) params.priority = priorityFilter as Priority;
       if (tagFilter) params.tag = tagFilter;
-      if (sortBy) params.sort = sortBy as 'priority' | 'alpha' | 'id';
+      if (sortBy) params.sort = sortBy as 'priority' | 'alpha' | 'id' | 'due_date' | 'created_at';
+      // T036: Due-date filters
+      if (dueBefore) params.due_before = dueBefore;
+      if (dueAfter) params.due_after = dueAfter;
+      if (overdueOnly) params.overdue = overdueOnly;
       fetchTasks(params);
     };
 
     window.addEventListener('tasks-updated', handleTasksUpdated);
     return () => window.removeEventListener('tasks-updated', handleTasksUpdated);
-  }, [searchTerm, statusFilter, priorityFilter, tagFilter, sortBy, fetchTasks]);
+  }, [searchTerm, statusFilter, priorityFilter, tagFilter, sortBy, dueBefore, dueAfter, overdueOnly, fetchTasks]);
 
   const createTask = useCallback(async (request: CreateTaskRequest): Promise<Task | null> => {
     try {
@@ -217,5 +236,12 @@ export function useTasks(): UseTasksReturn {
     setTagFilter,
     sortBy,
     setSortBy,
+    // T036: Due-date filters
+    dueBefore,
+    setDueBefore,
+    dueAfter,
+    setDueAfter,
+    overdueOnly,
+    setOverdueOnly,
   };
 }

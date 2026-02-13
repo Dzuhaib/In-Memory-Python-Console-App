@@ -1,0 +1,44 @@
+# T075: Dapr component templates for kafka-pubsub, statestore, kubernetes-secrets
+---
+# Kafka Pub/Sub Component
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: kafka-pubsub
+  namespace: {{ .Values.namespace }}
+spec:
+  type: pubsub.kafka
+  version: v1
+  metadata:
+    - name: brokers
+      value: "{{ .Values.redpanda.name }}:9092"
+    - name: consumerGroup
+      value: "todo-service"
+    - name: authType
+      value: "none"
+---
+# PostgreSQL State Store Component
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: statestore
+  namespace: {{ .Values.namespace }}
+spec:
+  type: state.postgresql
+  version: v1
+  metadata:
+    - name: connectionString
+      secretKeyRef:
+        name: {{ .Values.backend.name }}-secrets
+        key: DATABASE_URL
+---
+# Kubernetes Secrets Store Component
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: kubernetes-secrets
+  namespace: {{ .Values.namespace }}
+spec:
+  type: secretstores.kubernetes
+  version: v1
+  metadata: []

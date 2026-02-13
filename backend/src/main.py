@@ -107,3 +107,73 @@ async def chat_endpoint(request: FastAPIRequest):
     """Chat endpoint for AI-powered todo assistant."""
     from chatkit_server import chat_endpoint
     return await chat_endpoint(request)
+
+
+# Task T059: Dapr Jobs callback endpoint
+@app.post("/api/jobs/trigger")
+async def jobs_trigger_callback(request: FastAPIRequest):
+    """Callback endpoint for Dapr Jobs API.
+
+    When a scheduled reminder job fires, Dapr calls this endpoint with the job data.
+    This endpoint publishes a reminder.due event to the reminders topic via Dapr Pub/Sub.
+
+    Expected request body:
+    {
+        "data": {
+            "task_id": <int>,
+            "type": "reminder",
+            "payload": {...}
+        }
+    }
+    """
+    from services.event_publisher import get_event_publisher
+    from config import settings
+    from utils.logger import get_logger
+
+    logger = get_logger(__name__)
+
+    try:
+        body = await request.json()
+        job_data = body.get("data", {})
+        task_id = job_data.get("task_id")
+        reminder_type = job_data.get("type", "reminder")
+        payload = job_data.get("payload", {})
+
+        if not task_id:
+            logger.warning("Jobs callback received without task_id")
+            return {"status": "DROP", "message": "Missing task_id"}
+
+        logger.info(f"Jobs callback received for task #{task_id}")
+
+        # Publish reminder.due event to reminders topic
+        publisher = get_event_publisher(
+            dapr_port=settings.dapr_http_port,
+            pubsub_name=settings.pubsub_name,
+        )
+        await publisher.publish(
+            topic="reminders",
+            event_type="reminder.due",
+            task_id=task_id,
+            task_snapshot=payload,
+            actor="system",
+            metadata={"reminder_type": reminder_type},
+        )
+
+        return {"status": "SUCCESS"}
+
+    except Exception as e:
+        logger.error(f"Error processing jobs callback: {e}")
+        return {"status": "RETRY"}
+
+
+# Task T064: Dapr subscription endpoint
+@app.get("/dapr/subscribe")
+async def dapr_subscribe():
+    """Dapr programmatic subscription endpoint.
+
+    The backend publishes to topics but does not subscribe to any.
+    Consumer microservices have their own /dapr/subscribe endpoints.
+
+    Returns an empty subscription list for the backend.
+    """
+    return []

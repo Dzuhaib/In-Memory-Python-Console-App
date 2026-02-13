@@ -80,3 +80,95 @@ frontend:
       periodSeconds: 5
       timeoutSeconds: 3
       failureThreshold: 3
+
+# Redpanda configuration (Kafka-compatible streaming)
+redpanda:
+  name: redpanda
+  replicas: 1
+  image:
+    repository: docker.redpanda.com/redpandadata/redpanda
+    tag: v24.2.4
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+# Notification Service configuration
+notificationService:
+  name: notification-service
+  replicas: 1
+  image:
+    repository: notification-service
+    tag: local
+    pullPolicy: Never
+  service:
+    type: ClusterIP
+    port: 8002
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+# Recurring Task Service configuration
+recurringTaskService:
+  name: recurring-task-service
+  replicas: 1
+  image:
+    repository: recurring-task-service
+    tag: local
+    pullPolicy: Never
+  service:
+    type: ClusterIP
+    port: 8003
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+# Audit Service configuration
+auditService:
+  name: audit-service
+  replicas: 1
+  image:
+    repository: audit-service
+    tag: local
+    pullPolicy: Never
+  service:
+    type: ClusterIP
+    port: 8001
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+# WebSocket Service configuration
+websocketService:
+  name: websocket-service
+  replicas: 1
+  image:
+    repository: websocket-service
+    tag: local
+    pullPolicy: Never
+  service:
+    type: ClusterIP
+    port: 8004
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"

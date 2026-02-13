@@ -1,0 +1,17 @@
+# T068: Notification Service Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "todo-app.notificationService.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.notificationService.service.type }}
+  selector:
+    {{- include "todo-app.notificationService.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.notificationService.service.port }}
+      targetPort: {{ .Values.notificationService.service.port }}
+      protocol: TCP

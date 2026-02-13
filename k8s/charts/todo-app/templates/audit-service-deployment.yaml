@@ -1,0 +1,55 @@
+# T071: Audit Service Deployment with Dapr annotations
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.auditService.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "todo-app.auditService.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.auditService.replicas }}
+  selector:
+    matchLabels:
+      {{- include "todo-app.auditService.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "todo-app.auditService.labels" . | nindent 8 }}
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "audit-service"
+        dapr.io/app-port: "{{ .Values.auditService.service.port }}"
+        dapr.io/log-level: "info"
+    spec:
+      containers:
+        - name: audit-service
+          image: "{{ .Values.auditService.image.repository }}:{{ .Values.auditService.image.tag }}"
+          imagePullPolicy: {{ .Values.auditService.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.auditService.service.port }}
+              name: http
+          env:
+            - name: PORT
+              value: "{{ .Values.auditService.service.port }}"
+            - name: DAPR_HTTP_PORT
+              value: "3500"
+            - name: PUBSUB_NAME
+              value: "kafka-pubsub"
+          resources:
+            {{- toYaml .Values.auditService.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.auditService.service.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.auditService.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3

@@ -59,6 +59,9 @@ def get_engine():
 def run_migrations(db_engine) -> None:
     """Ensure the task table matches the current model schema.
 
+    Task T011: Update database migration checker to expect new columns
+    (due_at, remind_at, recurrence_rule, recurrence_interval).
+
     The table may have been created in Phase 1 with a different schema
     (e.g. 'is_complete' instead of 'completed'). If the schema doesn't
     match, drop and recreate the table.
@@ -69,9 +72,14 @@ def run_migrations(db_engine) -> None:
         inspector = inspect(db_engine)
         if "task" in inspector.get_table_names():
             columns = {col["name"] for col in inspector.get_columns("task")}
-            expected = {"id", "title", "completed", "priority", "tags", "created_at", "updated_at"}
+            # Phase 5 expected columns (T011)
+            expected = {
+                "id", "title", "completed", "priority", "tags",
+                "created_at", "updated_at",
+                "due_at", "remind_at", "recurrence_rule", "recurrence_interval"
+            }
 
-            # If schema doesn't match (e.g. has 'is_complete' from Phase 1), recreate
+            # If schema doesn't match (e.g. has 'is_complete' from Phase 1 or missing Phase 5 fields), recreate
             if "is_complete" in columns or not expected.issubset(columns):
                 print("Migration: Table schema mismatch detected, recreating task table", file=sys.stderr)
                 with db_engine.begin() as conn:

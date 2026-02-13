@@ -1,0 +1,63 @@
+# T065: Redpanda StatefulSet - single-node, ephemeral storage for local development
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.redpanda.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: todo-app
+    component: redpanda
+    tier: infrastructure
+spec:
+  serviceName: {{ .Values.redpanda.name }}
+  replicas: {{ .Values.redpanda.replicas }}
+  selector:
+    matchLabels:
+      app: todo-app
+      component: redpanda
+  template:
+    metadata:
+      labels:
+        app: todo-app
+        component: redpanda
+        tier: infrastructure
+    spec:
+      containers:
+        - name: redpanda
+          image: "{{ .Values.redpanda.image.repository }}:{{ .Values.redpanda.image.tag }}"
+          imagePullPolicy: {{ .Values.redpanda.image.pullPolicy }}
+          ports:
+            - containerPort: 9092
+              name: kafka
+            - containerPort: 8082
+              name: admin
+          command:
+            - /usr/bin/rpk
+            - redpanda
+            - start
+            - --smp=1
+            - --memory=1G
+            - --reserve-memory=0M
+            - --overprovisioned
+            - --node-id=0
+            - --check=false
+            - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+            - --advertise-kafka-addr=PLAINTEXT://{{ .Values.redpanda.name }}:9092
+          resources:
+            {{- toYaml .Values.redpanda.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /v1/status/ready
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /v1/status/ready
+              port: 8082
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3

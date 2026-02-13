@@ -199,7 +199,108 @@ Check the health endpoints work:
 kubectl exec -it <pod-name> -n todo-app -- curl http://localhost:8000/health
 ```
 
-## Next Steps
+## Phase 5: Event-Driven Microservices Deployment
 
-- **Phase 5**: Deploy to DigitalOcean DOKS with Kafka and Dapr
-- See `specs/005-phase5-cloud-deployment/` for cloud deployment docs
+### Architecture (Phase 5)
+
+```
+                                    ┌─────────────────────────┐
+                                    │       Frontend          │
+                                    │    (Next.js + WS)       │
+                                    └─────────┬───────────────┘
+                                              │ HTTP / WebSocket
+                                              ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                         Dapr Sidecar                                 │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │                     Backend (FastAPI)                            │ │
+│  │  Task API  │  Chat API  │  Event Publisher  │  Jobs Callback   │ │
+│  └────────────┴────────────┴──────────────────┴───────────────────┘ │
+└──────────────────────────────────────────────────────────────────────┘
+                                    │
+                    Kafka/Redpanda Topics
+                    ┌───────────────┼───────────────┐
+                    ▼               ▼               ▼
+            ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+            │ task-events  │ │  reminders   │ │ task-updates  │
+            └──────┬───────┘ └──────┬───────┘ └──────┬───────┘
+          ┌────────┴────────┐      │                │
+          ▼                 ▼      ▼                ▼
+  ┌───────────────┐ ┌───────────┐ ┌──────────────┐ ┌──────────────┐
+  │ recurring-    │ │ audit-    │ │ notification-│ │ websocket-   │
+  │ task-service  │ │ service   │ │ service      │ │ service      │
+  └───────────────┘ └───────────┘ └──────────────┘ └──────────────┘
+```
+
+### Phase 5 Services
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| Backend (FastAPI) | 8000 | Task API + Event Publisher + Jobs Callback |
+| Frontend (Next.js) | 3000 | Web UI + WebSocket client |
+| audit-service | 8001 | Logs all task events as structured JSON |
+| notification-service | 8002 | Processes reminders, forwards to WebSocket |
+| recurring-task-service | 8003 | Spawns new task instances on completion |
+| websocket-service | 8004 | Broadcasts real-time updates via WebSocket |
+| Redpanda | 9092 | Kafka-compatible message broker |
+
+### Phase 5 Minikube Deployment
+
+```bash
+# Start Minikube with sufficient resources
+minikube start --memory=6144 --cpus=4
+
+# Install Dapr on cluster
+dapr init -k
+
+# Use Minikube's Docker daemon
+eval $(minikube docker-env)
+
+# Build all images
+docker build -t todo-backend:local ./backend
+docker build -t todo-frontend:local ./frontend
+docker build -t audit-service:local ./services/audit-service
+docker build -t notification-service:local ./services/notification-service
+docker build -t recurring-task-service:local ./services/recurring-task-service
+docker build -t websocket-service:local ./services/websocket-service
+
+# Deploy with Helm
+helm install todo-app ./k8s/charts/todo-app \
+  --set backend.secrets.DATABASE_URL='your-db-url' \
+  --set backend.secrets.OPENAI_API_KEY='your-api-key'
+
+# Verify all pods are running (expect 7+ pods: backend, frontend, 4 consumers, redpanda + Dapr sidecars)
+kubectl get pods -n default
+
+# Smoke test
+minikube service frontend-service
+```
+
+### Phase 5 Cloud Deployment
+
+```bash
+# Deploy to cloud with production values
+helm upgrade --install todo-app ./k8s/charts/todo-app \
+  -f k8s/charts/todo-app/values-production.yaml
+
+# Verify
+kubectl get pods
+kubectl get ingress
+```
+
+See `specs/006-phase5-advanced-cloud/cloud-deploy-guide.md` for comprehensive cloud deployment instructions.
+
+### Phase 5 Environment Variables
+
+| Variable | Location | Description |
+|----------|----------|-------------|
+| DATABASE_URL | Secret | PostgreSQL connection string |
+| OPENAI_API_KEY | Secret | OpenAI API key for chatbot |
+| DAPR_HTTP_PORT | Env | Dapr sidecar HTTP port (default: 3500) |
+| PUBSUB_NAME | Env | Dapr Pub/Sub component name (default: kafka-pubsub) |
+| KAFKA_BROKERS | Secret | Kafka/Redpanda broker address |
+
+### CI/CD Pipeline
+
+- **CI** (`.github/workflows/ci.yml`): Runs on push/PR — Python lint (ruff), TS lint (eslint), pytest, jest, Docker builds, Helm lint
+- **Deploy** (`.github/workflows/deploy.yml`): Runs on push to main — builds/pushes images to GHCR, Helm deploys to cloud, rollback on failure

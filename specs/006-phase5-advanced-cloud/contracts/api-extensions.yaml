@@ -1,0 +1,334 @@
+# API Contract Extensions for Phase 5
+# Extends the existing Phase 2 API with new fields and endpoints
+# Base URL: /api/v1
+
+openapi: "3.0.3"
+info:
+  title: Todo App API — Phase 5 Extensions
+  version: "2.0.0"
+  description: Extensions to the existing Task API for recurring tasks, due dates, reminders, and event-driven features.
+
+paths:
+  /tasks:
+    post:
+      summary: Create a new task (extended)
+      description: Creates a task with optional due date, reminder, and recurrence rule.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "201":
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskResponse"
+        "422":
+          description: Validation error (e.g., remind_at > due_at)
+
+    get:
+      summary: List tasks (extended filters)
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Case-insensitive title search
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [complete, incomplete]
+        - name: priority
+          in: query
+          schema:
+            type: string
+            enum: [high, medium, low]
+        - name: tag
+          in: query
+          schema:
+            type: string
+        - name: due_before
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: "Filter tasks due before this datetime"
+        - name: due_after
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: "Filter tasks due after this datetime"
+        - name: overdue
+          in: query
+          schema:
+            type: boolean
+          description: "Filter only overdue tasks (due_at < now and not completed)"
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [id, priority, alpha, due_date, created_at]
+            default: id
+          description: "Sort order. due_date sorts ascending with nulls last."
+        - name: sort_dir
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+      responses:
+        "200":
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaskResponse"
+
+  /tasks/{task_id}:
+    put:
+      summary: Update a task (extended)
+      description: Update title, priority, due date, reminder, and/or recurrence.
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTaskRequest"
+      responses:
+        "200":
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskResponse"
+        "404":
+          description: Task not found
+        "422":
+          description: Validation error
+
+  # WebSocket endpoint for real-time updates
+  /ws:
+    get:
+      summary: WebSocket connection for real-time task updates
+      description: |
+        Clients connect via WebSocket to receive real-time task mutations.
+        Messages are JSON objects with event_type and task_snapshot fields.
+      responses:
+        "101":
+          description: WebSocket upgrade
+
+  # Dapr subscription endpoints (internal, called by Dapr sidecar)
+  /dapr/subscribe:
+    get:
+      summary: Dapr subscription configuration
+      description: Returns the list of Pub/Sub subscriptions for this service.
+      responses:
+        "200":
+          description: Subscription list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    pubsubname:
+                      type: string
+                    topic:
+                      type: string
+                    route:
+                      type: string
+
+  /api/events/task-events:
+    post:
+      summary: Dapr Pub/Sub callback for task-events topic
+      description: Called by Dapr when a message arrives on the task-events topic.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskEvent"
+      responses:
+        "200":
+          description: Event processed
+
+  /api/events/reminders:
+    post:
+      summary: Dapr Pub/Sub callback for reminders topic
+      description: Called by Dapr when a reminder message arrives.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskEvent"
+      responses:
+        "200":
+          description: Reminder processed
+
+  /api/jobs/trigger:
+    post:
+      summary: Dapr Jobs API callback
+      description: Called by Dapr when a scheduled job fires (e.g., reminder).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: object
+                  properties:
+                    task_id:
+                      type: integer
+                    user_id:
+                      type: string
+                    type:
+                      type: string
+      responses:
+        "200":
+          description: Job handled
+
+components:
+  schemas:
+    CreateTaskRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+        priority:
+          type: string
+          enum: [high, medium, low]
+          default: medium
+        tags:
+          type: array
+          items:
+            type: string
+          default: []
+        due_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: "Optional due date. Must be in the future."
+        remind_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: "Optional reminder time. Must be <= due_at if both set."
+        recurrence_rule:
+          type: string
+          enum: [daily, weekly, monthly, every_N_days]
+          nullable: true
+        recurrence_interval:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: "Required when recurrence_rule is every_N_days."
+
+    UpdateTaskRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+          nullable: true
+        priority:
+          type: string
+          enum: [high, medium, low]
+          nullable: true
+        due_at:
+          type: string
+          format: date-time
+          nullable: true
+        remind_at:
+          type: string
+          format: date-time
+          nullable: true
+        recurrence_rule:
+          type: string
+          enum: [daily, weekly, monthly, every_N_days]
+          nullable: true
+        recurrence_interval:
+          type: integer
+          minimum: 1
+          nullable: true
+
+    TaskResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        completed:
+          type: boolean
+        priority:
+          type: string
+          enum: [high, medium, low]
+        tags:
+          type: array
+          items:
+            type: string
+        due_at:
+          type: string
+          format: date-time
+          nullable: true
+        remind_at:
+          type: string
+          format: date-time
+          nullable: true
+        recurrence_rule:
+          type: string
+          nullable: true
+        recurrence_interval:
+          type: integer
+          nullable: true
+        is_overdue:
+          type: boolean
+          description: "Computed: true if due_at < now and not completed"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    TaskEvent:
+      type: object
+      required: [event_id, event_type, task_id, task_snapshot, actor, timestamp]
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+          enum: [task.created, task.updated, task.completed, task.deleted, reminder.due]
+        task_id:
+          type: integer
+        task_snapshot:
+          $ref: "#/components/schemas/TaskResponse"
+        actor:
+          type: string
+          enum: [user, system]
+        timestamp:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          additionalProperties: true

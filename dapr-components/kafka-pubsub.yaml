@@ -1,0 +1,17 @@
+# Task T054: Dapr Pub/Sub component for Kafka (Redpanda)
+# Used by backend to publish task events and by all consumer services to subscribe
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: kafka-pubsub
+  namespace: default
+spec:
+  type: pubsub.kafka
+  version: v1
+  metadata:
+    - name: brokers
+      value: "redpanda:9092"
+    - name: consumerGroup
+      value: "todo-service"
+    - name: authType
+      value: "none"

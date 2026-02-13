@@ -1,0 +1,57 @@
+# T069: Recurring Task Service Deployment with Dapr annotations
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.recurringTaskService.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "todo-app.recurringTaskService.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.recurringTaskService.replicas }}
+  selector:
+    matchLabels:
+      {{- include "todo-app.recurringTaskService.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "todo-app.recurringTaskService.labels" . | nindent 8 }}
+      annotations:
+        dapr.io/enabled: "true"
+        dapr.io/app-id: "recurring-task-service"
+        dapr.io/app-port: "{{ .Values.recurringTaskService.service.port }}"
+        dapr.io/log-level: "info"
+    spec:
+      containers:
+        - name: recurring-task-service
+          image: "{{ .Values.recurringTaskService.image.repository }}:{{ .Values.recurringTaskService.image.tag }}"
+          imagePullPolicy: {{ .Values.recurringTaskService.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.recurringTaskService.service.port }}
+              name: http
+          env:
+            - name: PORT
+              value: "{{ .Values.recurringTaskService.service.port }}"
+            - name: DAPR_HTTP_PORT
+              value: "3500"
+            - name: PUBSUB_NAME
+              value: "kafka-pubsub"
+            - name: BACKEND_URL
+              value: "http://backend-service:8000"
+          resources:
+            {{- toYaml .Values.recurringTaskService.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.recurringTaskService.service.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.recurringTaskService.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
