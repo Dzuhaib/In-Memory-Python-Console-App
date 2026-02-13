@@ -1,3 +1,4 @@
+{{- if not (and .Values.kafka (eq (toString .Values.kafka.deployLocal) "false")) }}
 # T066: Redpanda Service - ClusterIP for internal Kafka access
 apiVersion: v1
 kind: Service
@@ -23,3 +24,4 @@ spec:
       port: 8082
       targetPort: 8082
       protocol: TCP
+{{- end }}

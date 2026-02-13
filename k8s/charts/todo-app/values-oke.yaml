@@ -1,0 +1,260 @@
+# Oracle Cloud (OKE) values for todo-app Helm chart
+# Uses self-hosted Redpanda in K8s (no external Kafka needed)
+# Optimized for OKE Always Free tier (4 OCPUs, 24GB RAM across 2 nodes)
+
+namespace: todo-app
+environment: production
+
+# Backend configuration
+backend:
+  name: todo-backend
+  replicas: 1  # Single replica for free tier resource constraints
+  image:
+    repository: ghcr.io/dzuhaib/todo-app-backend
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  config:
+    LOG_LEVEL: "INFO"
+    PORT: "8000"
+    HOST: "0.0.0.0"
+    CORS_ORIGINS: "*"  # Will be updated with actual domain
+    DAPR_HTTP_PORT: "3500"
+    DAPR_GRPC_PORT: "50001"
+    PUBSUB_NAME: "kafka-pubsub"
+    DAPR_ENABLED: "true"
+  secrets:
+    DATABASE_URL: ""  # Set via kubectl create secret
+    OPENAI_API_KEY: ""  # Set via kubectl create secret
+  probes:
+    liveness:
+      path: /health
+      initialDelaySeconds: 60
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 5
+    readiness:
+      path: /health
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+  dapr:
+    enabled: true
+    appId: todo-backend
+    appPort: "8000"
+    logLevel: "info"
+    enableMetrics: true
+    metricsPort: "9090"
+
+# Frontend configuration
+frontend:
+  name: todo-frontend
+  replicas: 1
+  image:
+    repository: ghcr.io/dzuhaib/todo-app-frontend
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  config:
+    NEXT_PUBLIC_API_URL: "/api/v1"  # Relative path via ingress
+    NODE_ENV: "production"
+  probes:
+    liveness:
+      path: /
+      initialDelaySeconds: 60
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 5
+    readiness:
+      path: /
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+  dapr:
+    enabled: false
+
+# Self-hosted Redpanda (Kafka-compatible) - deployed in-cluster
+redpanda:
+  name: redpanda
+  replicas: 1
+  image:
+    repository: docker.redpanda.com/redpandadata/redpanda
+    tag: v24.2.4
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# Kafka configuration - use local Redpanda (no cloud Kafka)
+kafka:
+  deployLocal: true  # Deploy Redpanda StatefulSet in-cluster
+
+# Consumer Microservices
+notificationService:
+  name: notification-service
+  replicas: 1
+  image:
+    repository: ghcr.io/dzuhaib/todo-app-notification-service
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 8002
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+  dapr:
+    enabled: true
+    appId: notification-service
+    appPort: "8002"
+    logLevel: "info"
+
+recurringTaskService:
+  name: recurring-task-service
+  replicas: 1
+  image:
+    repository: ghcr.io/dzuhaib/todo-app-recurring-task-service
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 8003
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+  dapr:
+    enabled: true
+    appId: recurring-task-service
+    appPort: "8003"
+    logLevel: "info"
+
+auditService:
+  name: audit-service
+  replicas: 1
+  image:
+    repository: ghcr.io/dzuhaib/todo-app-audit-service
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 8001
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+  dapr:
+    enabled: true
+    appId: audit-service
+    appPort: "8001"
+    logLevel: "info"
+
+websocketService:
+  name: websocket-service
+  replicas: 1
+  image:
+    repository: ghcr.io/dzuhaib/todo-app-websocket-service
+    tag: latest
+    pullPolicy: Always
+  service:
+    type: ClusterIP
+    port: 8004
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+  dapr:
+    enabled: true
+    appId: websocket-service
+    appPort: "8004"
+    logLevel: "info"
+
+# Ingress - nginx with Let's Encrypt TLS
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+  hosts:
+    - host: todo.example.com  # Replace with nip.io or real domain
+      paths:
+        - path: /api
+          pathType: Prefix
+          backend:
+            service: backend-service
+            port: 8000
+        - path: /
+          pathType: Prefix
+          backend:
+            service: frontend-service
+            port: 3000
+  tls:
+    - secretName: todo-app-tls
+      hosts:
+        - todo.example.com  # Replace with actual domain
+
+# Image pull secrets for GHCR
+imagePullSecrets:
+  - name: ghcr-secret
+
+# Dapr Components Configuration
+dapr:
+  components:
+    pubsub:
+      name: kafka-pubsub
+      type: pubsub.kafka
+      version: v1
+      consumerGroup: todo-service
+    statestore:
+      name: statestore
+      type: state.postgresql
+      version: v1
+    secrets:
+      name: kubernetes-secrets
+      type: secretstores.kubernetes
+      version: v1
+
+# cert-manager
+certManager:
+  clusterIssuer: letsencrypt-prod
+  email: admin@example.com  # Replace with your email

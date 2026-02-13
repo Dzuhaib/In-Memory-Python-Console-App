@@ -81,6 +81,10 @@ frontend:
       timeoutSeconds: 3
       failureThreshold: 3
 
+# Kafka deployment mode (local = self-hosted Redpanda, false = cloud Kafka)
+kafka:
+  deployLocal: true
+
 # Redpanda configuration (Kafka-compatible streaming)
 redpanda:
   name: redpanda

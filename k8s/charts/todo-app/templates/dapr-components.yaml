@@ -1,4 +1,4 @@
-# T075: Dapr component templates for kafka-pubsub, statestore, kubernetes-secrets
+# Dapr component templates: kafka-pubsub, statestore, kubernetes-secrets
 ---
 # Kafka Pub/Sub Component
 apiVersion: dapr.io/v1alpha1
@@ -10,12 +10,37 @@ spec:
   type: pubsub.kafka
   version: v1
   metadata:
+    {{- if and .Values.kafka .Values.kafka.cloud .Values.kafka.cloud.enabled }}
+    # Cloud Kafka configuration (Redpanda Cloud / Confluent / Strimzi external)
+    - name: brokers
+      value: {{ .Values.kafka.cloud.bootstrapServers | quote }}
+    - name: authType
+      value: "password"
+    - name: saslUsername
+      secretKeyRef:
+        name: redpanda-kafka-credentials
+        key: sasl-username
+    - name: saslPassword
+      secretKeyRef:
+        name: redpanda-kafka-credentials
+        key: sasl-password
+    - name: saslMechanism
+      value: {{ .Values.kafka.cloud.sasl.mechanism | default "SCRAM-SHA-256" | quote }}
+    {{- if .Values.kafka.cloud.tls.enabled }}
+    - name: requiredAcks
+      value: "all"
+    {{- end }}
+    {{- else }}
+    # Local Kafka configuration (in-cluster Redpanda or Strimzi)
     - name: brokers
       value: "{{ .Values.redpanda.name }}:9092"
-    - name: consumerGroup
-      value: "todo-service"
     - name: authType
       value: "none"
+    {{- end }}
+    - name: consumerGroup
+      value: "todo-service"
+    - name: maxMessageBytes
+      value: "1024000"
 ---
 # PostgreSQL State Store Component
 apiVersion: dapr.io/v1alpha1
